@@ -118,9 +118,9 @@ class AppTheme {
     ),
 
     appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.darkSurface,
+      backgroundColor: AppColors.darkSurface, 
       foregroundColor: Colors.white,
-      elevation: 0,
+      elevation: 0, 
       centerTitle: true,
     ),
 
