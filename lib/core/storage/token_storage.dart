@@ -128,6 +128,19 @@ class TokenStorage {
       final settings = _asMap(primary['settings']);
       await prefs.setString(_currentGroup, jsonEncode(group));
       await prefs.setString('current_group_settings', jsonEncode(settings));
+      await prefs.setString(
+        'current_group_role',
+        (primary['role'] ?? 'MEMBER').toString(),
+      );
+      final groupPermissions = primary['permissions'];
+      await prefs.setStringList(
+        'current_group_permissions',
+        groupPermissions is List
+            ? groupPermissions
+                  .map((permission) => permission.toString())
+                  .toList()
+            : <String>[],
+      );
       await prefs.setInt(
         'current_group_id',
         (group['groupId'] as num?)?.toInt() ?? 0,
@@ -229,6 +242,16 @@ class TokenStorage {
   static Future<List<String>> getRoles() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList(_roles) ?? [];
+  }
+
+  static Future<String> getCurrentGroupRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('current_group_role') ?? 'MEMBER';
+  }
+
+  static Future<List<String>> getCurrentGroupPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList('current_group_permissions') ?? [];
   }
 
   static Future<List<Map<String, dynamic>>> getBranches() async {

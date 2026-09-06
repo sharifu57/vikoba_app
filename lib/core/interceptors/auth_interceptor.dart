@@ -18,7 +18,11 @@ class AuthInterceptor extends Interceptor {
     if (!isPublicRequest) {
       final token = await TokenStorage.getToken();
       if (token != null && token.isNotEmpty) {
-        options.headers['Authorization'] = 'Bearer $token';
+        final normalizedToken = token.replaceFirst(
+          RegExp(r'^Bearer\s+', caseSensitive: false),
+          '',
+        );
+        options.headers['Authorization'] = 'Bearer ${normalizedToken.trim()}';
       }
     }
 

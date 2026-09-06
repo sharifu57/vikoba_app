@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'package:vikoba_app/config/app_config.dart';
+import 'package:vikoba_app/core/storage/token_storage.dart';
 
 class MemberDashboardApi {
   MemberDashboardApi(this._dio);
@@ -111,6 +112,17 @@ class MemberDashboardApi {
     String? proofText,
     String? proofFilePath,
   }) async {
+    final storedToken = await TokenStorage.getToken();
+    final token = storedToken
+        ?.replaceFirst(RegExp(r'^Bearer\s+', caseSensitive: false), '')
+        .trim();
+    if (token == null || token.isEmpty) {
+      throw DioException(
+        requestOptions: RequestOptions(path: 'share-purchase-proof'),
+        message: 'Your session has expired. Please sign in again.',
+      );
+    }
+
     final form = FormData.fromMap({
       'groupMemberId': groupMemberId,
       'quantity': quantity,
@@ -126,7 +138,10 @@ class MemberDashboardApi {
     final response = await _dio.post(
       AppConfig.sharePurchaseRequests(groupId),
       data: form,
-      options: Options(extra: {'requiresAuth': true}),
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+        extra: {'requiresAuth': true},
+      ),
     );
     final body = response.data;
     if (body is! Map) {

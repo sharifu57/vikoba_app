@@ -17,6 +17,8 @@ class MemberController extends GetxController {
   final shareSummary = <String, dynamic>{}.obs;
   final shareLedger = <Map<String, dynamic>>[].obs;
   final memberList = <Map<String, dynamic>>[].obs;
+  final currentGroupRole = 'MEMBER'.obs;
+  final currentGroupPermissions = <String>[].obs;
 
   @override
   void onInit() {
@@ -25,7 +27,7 @@ class MemberController extends GetxController {
     loadDashboard();
   }
 
-  Future<void> loadDashboard() async {
+  Future<void> loadDashboard({bool showError = true}) async {
     isLoading.value = true;
     errorMessage.value = null;
     try {
@@ -33,6 +35,10 @@ class MemberController extends GetxController {
       groupName.value = await TokenStorage.getCurrentGroupName();
       currency.value = await TokenStorage.getCurrentGroupCurrency();
       memberName.value = await TokenStorage.getDisplayName();
+      currentGroupRole.value = await TokenStorage.getCurrentGroupRole();
+      currentGroupPermissions.assignAll(
+        await TokenStorage.getCurrentGroupPermissions(),
+      );
       final settings = await TokenStorage.getCurrentGroupSettings();
       final sharePrice = _number(settings['sharePrice']);
       shareSummary.assignAll({
@@ -83,7 +89,9 @@ class MemberController extends GetxController {
         'totalCapital': unitPrice * totalShares,
       });
     } catch (error) {
-      errorMessage.value = _message(error);
+      if (showError) {
+        errorMessage.value = _message(error);
+      }
     } finally {
       isLoading.value = false;
     }
@@ -150,9 +158,10 @@ class MemberController extends GetxController {
         proofFilePath: proofFilePath,
       );
     } catch (error) {
-      throw Exception(_message(error));
+      throw Exception(_message(error, operation: 'submit payment proof'));
     }
-    await loadDashboard();
+
+    await loadDashboard(showError: false);
   }
 
   Future<void> logout() async {
@@ -160,13 +169,21 @@ class MemberController extends GetxController {
     Get.offAllNamed('/login');
   }
 
-  String _message(Object error) {
+  String _message(
+    Object error, {
+    String operation = 'load your group dashboard',
+  }) {
     if (error is DioException) {
       final data = error.response?.data;
-      if (data is Map && data['message'] is String) {
-        return data['message'] as String;
+      if (data is Map) {
+        final message =
+            data['message'] ??
+            (data['error'] is Map ? data['error']['message'] : null);
+        if (message is String && message.trim().isNotEmpty) {
+          return message;
+        }
       }
-      return 'We could not load your group dashboard.';
+      return 'We could not $operation (${error.response?.statusCode ?? 'network error'}).';
     }
     return error.toString().replaceFirst('Exception: ', '');
   }

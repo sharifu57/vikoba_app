@@ -462,7 +462,7 @@ class _ProfileView extends StatelessWidget {
                 SizedBox(height: 6.h),
                 Text(
                   controller.memberProfile['role']?.toString() ??
-                      'Member profile',
+                      controller.currentGroupRole.value,
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12.sp,
