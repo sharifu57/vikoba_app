@@ -23,6 +23,7 @@ class TokenStorage {
   static const _organizationId = "organization_id";
   static const _organizationName = "organization_name";
   static const _currentGroup = "current_group";
+  static const _darkTheme = "dark_theme";
 
   static Map<String, dynamic> _asMap(Object? value) {
     return value is Map
@@ -55,6 +56,8 @@ class TokenStorage {
     await prefs.setInt(_userId, (user["id"] as num?)?.toInt() ?? 0);
 
     await prefs.setString(_fullName, user["fullName"] ?? "");
+    final fullName = (user["fullName"] ?? user["username"] ?? "").toString();
+    await prefs.setString(_fullName, fullName);
 
     await prefs.setString(_email, user["email"] ?? "");
 
@@ -122,7 +125,9 @@ class TokenStorage {
         orElse: () => groups.first,
       );
       final group = _asMap(primary['group']);
+      final settings = _asMap(primary['settings']);
       await prefs.setString(_currentGroup, jsonEncode(group));
+      await prefs.setString('current_group_settings', jsonEncode(settings));
       await prefs.setInt(
         'current_group_id',
         (group['groupId'] as num?)?.toInt() ?? 0,
@@ -168,6 +173,39 @@ class TokenStorage {
     return prefs.getString(_fullName);
   }
 
+  static String getGreetingForTime(int hour, [String? name]) {
+    final displayName = (name ?? '').trim();
+    final greeting = switch (hour) {
+      >= 5 && < 12 => 'Good morning',
+      >= 12 && < 17 => 'Good afternoon',
+      _ => 'Good evening',
+    };
+
+    return displayName.isEmpty
+        ? '$greeting, member'
+        : '$greeting, $displayName';
+  }
+
+  static Future<String> getDisplayName() async {
+    final name = await getFullName();
+    return (name ?? '').trim().isNotEmpty ? name!.trim() : 'Member';
+  }
+
+  static Future<Map<String, dynamic>> getCurrentGroupSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('current_group_settings');
+    if (raw == null || raw.isEmpty) return {};
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {}
+
+    return {};
+  }
+
   static Future<String?> getEmail() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_email);
@@ -176,6 +214,16 @@ class TokenStorage {
   static Future<String?> getPhone() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_phone);
+  }
+
+  static Future<bool> getDarkTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_darkTheme) ?? false;
+  }
+
+  static Future<void> saveDarkTheme(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_darkTheme, enabled);
   }
 
   static Future<List<String>> getRoles() async {

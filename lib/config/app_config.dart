@@ -15,7 +15,18 @@ class AppConfig {
   static String get resendOtp => "$auth/resend-otp";
   static String get refreshToken => "$auth/refresh";
   static String get logout => "$auth/logout";
+  static String get shares => "$baseUrl/api/shares";
 
   static String dashboardGroup(int groupId) =>
       "$baseUrl/api/dashboard/group/$groupId";
+
+  static String groupMembers(int groupId) =>
+      "$baseUrl/api/members/group/$groupId";
+
+  static String shareSummary(int groupId) => "$shares/group/$groupId/summary";
+
+  static String shareLedger(int groupId) => "$shares/group/$groupId/ledger";
+
+  static String purchaseShares(int groupId) =>
+      "$shares/group/$groupId/purchase";
 }

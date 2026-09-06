@@ -5,18 +5,22 @@ import 'package:get/get.dart';
 import 'package:vikoba_app/app/constants/app_theme.dart';
 import 'package:vikoba_app/app/routes/app_routes.dart';
 import 'package:vikoba_app/config/app_client.dart';
+import 'package:vikoba_app/core/storage/token_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: '.env', isOptional: true);
   await AppClient.init();
+  final darkThemeEnabled = await TokenStorage.getDarkTheme();
 
-  runApp(const MyApp());
+  runApp(MyApp(darkThemeEnabled: darkThemeEnabled));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({required this.darkThemeEnabled, super.key});
+
+  final bool darkThemeEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +37,7 @@ class MyApp extends StatelessWidget {
           title: 'Vikoba 360',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeMode.light,
+          themeMode: darkThemeEnabled ? ThemeMode.dark : ThemeMode.light,
           defaultTransition: Transition.fade,
           initialRoute: '/splash',
           getPages: AppRoutes.pages,

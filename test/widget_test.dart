@@ -1,30 +1,63 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:vikoba_app/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vikoba_app/core/storage/token_storage.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  group('TokenStorage greeting logic', () {
+    test('returns a morning greeting for the member before noon', () {
+      final greeting = TokenStorage.getGreetingForTime(9, 'Asha');
+      expect(greeting, 'Good morning, Asha');
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('returns an evening greeting for the member after sunset', () {
+      final greeting = TokenStorage.getGreetingForTime(20, 'Juma');
+      expect(greeting, 'Good evening, Juma');
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test(
+      'uses the OTP username and active group settings from the login payload',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+
+        await TokenStorage.saveSession({
+          'token': 'abc',
+          'refreshToken': 'xyz',
+          'expired': '86400000000',
+          'data': {
+            'user': {
+              'id': 11,
+              'username': 'Kizigo Kidogo',
+              'email': 'kizigo@gmail.com',
+              'phone': '255888888888',
+            },
+            'groups': [
+              {
+                'group': {
+                  'groupId': 26,
+                  'groupName': 'KIZIGO INK',
+                  'currency': 'TZS',
+                },
+                'settings': {
+                  'sharePrice': 5000.00,
+                  'maximumSharesPerMember': 20,
+                  'minimumContribution': 5.00,
+                },
+                'settingsConfigured': true,
+              },
+            ],
+          },
+        });
+
+        expect(await TokenStorage.getDisplayName(), 'Kizigo Kidogo');
+        expect(await TokenStorage.getCurrentGroupName(), 'KIZIGO INK');
+        expect(await TokenStorage.getCurrentGroupCurrency(), 'TZS');
+
+        final settings = await TokenStorage.getCurrentGroupSettings();
+        expect(settings['sharePrice'], 5000.0);
+        expect(settings['maximumSharesPerMember'], 20);
+      },
+    );
   });
 }
