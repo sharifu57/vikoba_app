@@ -11,12 +11,14 @@ class AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final requiresAuth = options.extra["requiresAuth"] == true;
+    final isPublicRequest =
+        options.extra["requiresAuth"] == false ||
+        options.path.startsWith('/api/auth/');
 
-    if (requiresAuth) {
+    if (!isPublicRequest) {
       final token = await TokenStorage.getToken();
       if (token != null && token.isNotEmpty) {
-        options.headers["authorization"] = "Bearer $token";
+        options.headers['Authorization'] = 'Bearer $token';
       }
     }
 

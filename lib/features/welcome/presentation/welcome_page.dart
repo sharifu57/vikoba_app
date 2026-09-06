@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:vikoba_app/app/constants/app_colors.dart';
+import 'package:vikoba_app/app/widgets/vikoba_logo.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -14,32 +16,7 @@ class WelcomePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 42.w,
-                    height: 42.w,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(14.r),
-                    ),
-                    child: Icon(
-                      Icons.hub_rounded,
-                      color: Colors.white,
-                      size: 22.sp,
-                    ),
-                  ),
-                  SizedBox(width: 11.w),
-                  Text(
-                    'Vikoba',
-                    style: TextStyle(
-                      fontSize: 21.sp,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
+              const VikobaLogo(size: 42, showName: true, nameSize: 19),
               const Spacer(),
               Container(
                 width: double.infinity,
@@ -54,7 +31,7 @@ class WelcomePage extends StatelessWidget {
                     Icon(
                       Icons.auto_awesome_rounded,
                       color: AppColors.secondary,
-                      size: 27.sp,
+                      size: 25.sp,
                     ),
                     SizedBox(height: 38.h),
                     Text(
@@ -92,7 +69,7 @@ class WelcomePage extends StatelessWidget {
                 width: double.infinity,
                 height: 55.h,
                 child: FilledButton.icon(
-                  onPressed: () {},
+                  onPressed: () => Get.toNamed('/login'),
                   icon: const Icon(Icons.arrow_forward_rounded),
                   label: const Text('Get started'),
                   style: FilledButton.styleFrom(

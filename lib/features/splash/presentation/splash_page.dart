@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:vikoba_app/app/constants/app_colors.dart';
+import 'package:vikoba_app/app/constants/app_sizes.dart';
 import 'package:vikoba_app/app/constants/app_strings.dart';
+import 'package:vikoba_app/app/widgets/vikoba_logo.dart';
 import 'splash_controller.dart';
 
 class SplashPage extends GetView<SplashController> {
@@ -44,7 +46,7 @@ class SplashPage extends GetView<SplashController> {
                       () => AnimatedOpacity(
                         opacity: controller.reveal.value ? 1 : 0,
                         duration: const Duration(milliseconds: 700),
-                        child: const _BrandMark(),
+                        child: const VikobaLogo(size: 112, onDark: true),
                       ),
                     ),
                     SizedBox(height: 28.h),
@@ -52,7 +54,7 @@ class SplashPage extends GetView<SplashController> {
                       AppStrings.appName,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 42.sp,
+                        fontSize: AppSizes.fontXXXL,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -1.2,
                       ),
@@ -63,7 +65,7 @@ class SplashPage extends GetView<SplashController> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: .78),
-                        fontSize: 15.sp,
+                        fontSize: AppSizes.fontMD - 3.sp,
                         fontWeight: FontWeight.w500,
                         letterSpacing: .2,
                       ),
@@ -89,10 +91,10 @@ class SplashPage extends GetView<SplashController> {
                     ),
                     SizedBox(height: 13.h),
                     Text(
-                      'Preparing your circle',
+                      'Preparing your circle (s)',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: .5),
-                        fontSize: 10.sp,
+                        fontSize: AppSizes.fontXS,
                         fontWeight: FontWeight.w600,
                         letterSpacing: .8,
                       ),
@@ -112,37 +114,6 @@ class SplashPage extends GetView<SplashController> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BrandMark extends StatelessWidget {
-  const _BrandMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 112.w,
-      height: 112.w,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .1),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: .2),
-          width: 1.2,
-        ),
-      ),
-      child: Center(
-        child: Container(
-          width: 76.w,
-          height: 76.w,
-          decoration: const BoxDecoration(
-            color: AppColors.secondary,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(Icons.hub_rounded, size: 43.sp, color: AppColors.primary),
         ),
       ),
     );

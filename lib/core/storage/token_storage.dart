@@ -22,11 +22,24 @@ class TokenStorage {
 
   static const _organizationId = "organization_id";
   static const _organizationName = "organization_name";
+  static const _currentGroup = "current_group";
+
+  static Map<String, dynamic> _asMap(Object? value) {
+    return value is Map
+        ? Map<String, dynamic>.from(value)
+        : <String, dynamic>{};
+  }
 
   static Future<void> saveSession(Map<String, dynamic> response) async {
     final prefs = await SharedPreferences.getInstance();
 
-    final user = response["data"];
+    final session = _asMap(response["data"]);
+    final user = _asMap(session["user"] ?? session);
+    final groups = session["groups"] is List
+        ? List<Map<String, dynamic>>.from(
+            (session["groups"] as List).map(_asMap),
+          )
+        : <Map<String, dynamic>>[];
 
     await prefs.setString(_accessToken, response["token"] ?? "");
 
@@ -39,7 +52,7 @@ class TokenStorage {
       DateTime.now().add(const Duration(days: 1)).toIso8601String(),
     );
 
-    await prefs.setInt(_userId, user["id"] ?? 0);
+    await prefs.setInt(_userId, (user["id"] as num?)?.toInt() ?? 0);
 
     await prefs.setString(_fullName, user["fullName"] ?? "");
 
@@ -53,7 +66,7 @@ class TokenStorage {
 
     final roles = <String>[];
 
-    if (user["roles"] != null) {
+    if (user["roles"] is List) {
       for (final role in user["roles"]) {
         if (role is String) {
           roles.add(role);
@@ -87,7 +100,7 @@ class TokenStorage {
 
     final permissions = <String>{}; // Set removes duplicates
 
-    if (user['branches'] != null) {
+    if (user['branches'] is List) {
       for (final branch in user['branches']) {
         final role = branch['role'];
 
@@ -101,6 +114,28 @@ class TokenStorage {
 
     await prefs.setStringList(_permissions, permissions.toList());
     await prefs.setString(_branches, jsonEncode(user["branches"] ?? []));
+    await prefs.setString('groups', jsonEncode(groups));
+
+    if (groups.isNotEmpty) {
+      final primary = groups.firstWhere(
+        (item) => item['settingsConfigured'] == true,
+        orElse: () => groups.first,
+      );
+      final group = _asMap(primary['group']);
+      await prefs.setString(_currentGroup, jsonEncode(group));
+      await prefs.setInt(
+        'current_group_id',
+        (group['groupId'] as num?)?.toInt() ?? 0,
+      );
+      await prefs.setString(
+        'current_group_name',
+        group['groupName'] ?? 'Vikoba group',
+      );
+      await prefs.setString(
+        'current_group_currency',
+        group['currency'] ?? 'TZS',
+      );
+    }
 
     // Save organization details
     if (user["branches"] != null && user["branches"].isNotEmpty) {
@@ -227,34 +262,7 @@ class TokenStorage {
   }
 
   static Future<void> navigateAfterLogin() async {
-    final branches = await TokenStorage.getBranches();
-    final selectedBranch = await TokenStorage.getSelectedBranch();
-
-    //get roles and see if has supplier role
-    final roles = await TokenStorage.getRoles();
-
-    if (roles.contains("SUPPLIER")) {
-      Get.offAllNamed("/supplier-wrapper");
-      return;
-    }
-
-    if (selectedBranch != null) {
-      Get.offAllNamed("/wrapper");
-      return;
-    }
-
-    if (branches.length == 1) {
-      await TokenStorage.saveSelectedBranch(branches.first);
-      Get.offAllNamed("/wrapper");
-      return;
-    }
-
-    if (branches.isEmpty) {
-      Get.offAllNamed("/no-branch");
-      return;
-    }
-
-    Get.offAllNamed("/select-branch");
+    Get.offAllNamed('/member');
   }
 
   static Future<List<String>> getPermissions() async {
@@ -277,5 +285,20 @@ class TokenStorage {
     final prefs = await SharedPreferences.getInstance();
 
     return prefs.getString(_organizationName);
+  }
+
+  static Future<int?> getCurrentGroupId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('current_group_id');
+  }
+
+  static Future<String> getCurrentGroupName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('current_group_name') ?? 'Vikoba group';
+  }
+
+  static Future<String> getCurrentGroupCurrency() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('current_group_currency') ?? 'TZS';
   }
 }

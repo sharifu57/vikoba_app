@@ -1,5 +1,5 @@
 class AppStrings {
-  static const String appName = 'Vikoba';
+  static const String appName = 'Vikoba 360';
   static const String ok = 'OK';
   static const String cancel = 'Cancel';
   static const String phoneNumber = 'Phone Number';

@@ -48,7 +48,7 @@ class AppSizes {
 
   /* ================= LAYOUT ================= */
 
-  static double get horizontal => 13.w;
-  static double get vertical => 16.h;
+  static double get horizontal => 24.w;
+  static double get vertical => 20.h;
   static double get maxContentWidth => 600.w;
 }

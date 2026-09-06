@@ -15,8 +15,7 @@ class AppConfig {
   static String get resendOtp => "$auth/resend-otp";
   static String get refreshToken => "$auth/refresh";
   static String get logout => "$auth/logout";
-  static String get roles => "$auth/roles";
-  static String get staffInvite => "$auth/staff-invite";
 
-  static String get staff => "$auth/organization-staff";
+  static String dashboardGroup(int groupId) =>
+      "$baseUrl/api/dashboard/group/$groupId";
 }
