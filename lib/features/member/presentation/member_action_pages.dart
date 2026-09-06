@@ -87,11 +87,12 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
 
   Future<void> _pickProofFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+        allowMultiple: false,
       );
-      final file = result?.files.single;
+      final file = files.isEmpty ? null : files.first;
       if (file?.path != null && mounted) {
         setState(() {
           _proofFilePath = file!.path;

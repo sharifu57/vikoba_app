@@ -1,3 +1,7 @@
+import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.dsl.LibraryExtension
+import org.gradle.kotlin.dsl.configure
+
 allprojects {
     repositories {
         google()
@@ -17,6 +21,18 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+
+    plugins.withId("com.android.application") {
+        extensions.configure<ApplicationExtension> {
+            compileSdk = 37
+        }
+    }
+
+    plugins.withId("com.android.library") {
+        extensions.configure<LibraryExtension> {
+            compileSdk = 37
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {
