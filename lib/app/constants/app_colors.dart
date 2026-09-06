@@ -31,4 +31,6 @@ class AppColors {
   // Borders
   static const border = Color(0xFFE5E7EB);
   static const darkBorder = Color(0xFF334155);
+  static const softBorder = Color(0xFFE9EFEB);
+  static const darkSoftBorder = Color(0xFF285043);
 }

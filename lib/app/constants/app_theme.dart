@@ -14,6 +14,8 @@ class AppTheme {
       primary: AppColors.primary,
       secondary: AppColors.secondary,
       surface: AppColors.surface,
+      outline: AppColors.softBorder,
+      outlineVariant: AppColors.softBorder,
       error: AppColors.error,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
@@ -28,17 +30,28 @@ class AppTheme {
       centerTitle: true,
     ),
 
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: AppColors.surface,
+      indicatorColor: AppColors.secondary.withValues(alpha: .2),
+      labelTextStyle: WidgetStatePropertyAll(
+        TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700),
+      ),
+      iconTheme: WidgetStatePropertyAll(
+        IconThemeData(color: AppColors.textSecondary),
+      ),
+    ),
+
     cardTheme: CardThemeData(
       color: AppColors.surface,
-      elevation: 1,
-      shadowColor: AppColors.textPrimary.withValues(alpha: 0.08),
+      elevation: 1.5,
+      shadowColor: AppColors.textPrimary.withValues(alpha: 0.06),
       surfaceTintColor: Colors.transparent,
 
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(
-          color: AppColors.border.withValues(alpha: 0.6),
-          width: 0.8,
+          color: AppColors.softBorder.withValues(alpha: 0.75),
+          width: 0.6,
         ),
       ),
     ),
@@ -110,6 +123,8 @@ class AppTheme {
       primary: AppColors.primary,
       secondary: AppColors.secondary,
       surface: AppColors.darkSurface,
+      outline: AppColors.darkSoftBorder,
+      outlineVariant: AppColors.darkSoftBorder,
       error: AppColors.error,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
@@ -118,10 +133,41 @@ class AppTheme {
     ),
 
     appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.darkSurface, 
+      backgroundColor: AppColors.darkSurface,
       foregroundColor: Colors.white,
-      elevation: 0, 
+      elevation: 0,
       centerTitle: true,
+    ),
+
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: AppColors.darkSurface,
+      indicatorColor: AppColors.secondary.withValues(alpha: .28),
+      labelTextStyle: WidgetStatePropertyAll(
+        TextStyle(
+          color: AppColors.darkTextPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      iconTheme: WidgetStatePropertyAll(
+        IconThemeData(color: AppColors.darkTextSecondary),
+      ),
+    ),
+
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.darkSurface,
+      titleTextStyle: TextStyle(
+        color: AppColors.darkTextPrimary,
+        fontWeight: FontWeight.w800,
+      ),
+      contentTextStyle: TextStyle(color: AppColors.darkTextSecondary),
+    ),
+
+    chipTheme: ChipThemeData(
+      backgroundColor: AppColors.darkSurface,
+      selectedColor: AppColors.primary.withValues(alpha: .35),
+      side: BorderSide(color: AppColors.darkBorder),
+      labelStyle: TextStyle(color: AppColors.darkTextPrimary),
+      secondaryLabelStyle: TextStyle(color: AppColors.darkTextPrimary),
     ),
 
     // DARK CARD THEME
@@ -134,8 +180,8 @@ class AppTheme {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(
-          color: AppColors.darkBorder.withValues(alpha: 0.5),
-          width: 0.8,
+          color: AppColors.darkSoftBorder.withValues(alpha: 0.7),
+          width: 0.6,
         ),
       ),
     ),

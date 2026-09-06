@@ -29,4 +29,7 @@ class AppConfig {
 
   static String purchaseShares(int groupId) =>
       "$shares/group/$groupId/purchase";
+
+  static String sharePurchaseRequests(int groupId) =>
+      "$baseUrl/api/share-purchase-requests/group/$groupId";
 }

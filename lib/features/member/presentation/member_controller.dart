@@ -122,6 +122,39 @@ class MemberController extends GetxController {
     await loadDashboard();
   }
 
+  Future<void> submitSharePurchaseProof({
+    required int quantity,
+    required double amount,
+    required String paymentMethod,
+    String? paymentReference,
+    String? proofText,
+    String? proofFilePath,
+  }) async {
+    final groupId = await TokenStorage.getCurrentGroupId();
+    final memberId = _memberId;
+    if (groupId == null || groupId <= 0) {
+      throw Exception('No group selected for share purchase.');
+    }
+    if (memberId == null) {
+      throw Exception('Your member profile could not be identified.');
+    }
+    try {
+      await _api.submitSharePurchaseProof(
+        groupId,
+        groupMemberId: memberId,
+        quantity: quantity,
+        amount: amount,
+        paymentMethod: paymentMethod,
+        paymentReference: paymentReference,
+        proofText: proofText,
+        proofFilePath: proofFilePath,
+      );
+    } catch (error) {
+      throw Exception(_message(error));
+    }
+    await loadDashboard();
+  }
+
   Future<void> logout() async {
     await TokenStorage.clear();
     Get.offAllNamed('/login');

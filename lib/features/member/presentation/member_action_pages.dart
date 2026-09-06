@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 
 import 'package:vikoba_app/app/constants/app_colors.dart';
@@ -16,9 +18,12 @@ class MemberSharePurchasePage extends StatefulWidget {
 class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
+  final _paymentReferenceController = TextEditingController();
   final _noteController = TextEditingController();
   String _paymentMethod = 'Cash';
   bool _isSubmitting = false;
+  String? _proofFilePath;
+  String? _proofFileName;
 
   MemberController get _controller => Get.find<MemberController>();
 
@@ -36,6 +41,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
   @override
   void dispose() {
     _amountController.dispose();
+    _paymentReferenceController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -48,16 +54,18 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
     setState(() => _isSubmitting = true);
 
     try {
-      await _controller.purchaseShares(
+      await _controller.submitSharePurchaseProof(
         quantity: quantity,
         amount: amount,
         paymentMethod: _paymentMethod,
-        reference: _noteController.text.trim(),
+        paymentReference: _paymentReferenceController.text.trim(),
+        proofText: _noteController.text.trim(),
+        proofFilePath: _proofFilePath,
       );
       if (!mounted) return;
       Get.snackbar(
-        'Share purchase recorded',
-        '$quantity share${quantity == 1 ? '' : 's'} submitted successfully.',
+        'Proof submitted for review',
+        '$quantity share${quantity == 1 ? '' : 's'} await admin or accountant approval.',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: AppColors.primary,
         colorText: Colors.white,
@@ -74,6 +82,40 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _pickProofFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+      );
+      final file = result?.files.single;
+      if (file?.path != null && mounted) {
+        setState(() {
+          _proofFilePath = file!.path;
+          _proofFileName = file.name;
+        });
+      }
+    } on MissingPluginException {
+      if (!mounted) return;
+      Get.snackbar(
+        'File picker unavailable',
+        'Please completely stop and rebuild the app before attaching a proof file.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error,
+        colorText: Colors.white,
+      );
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      Get.snackbar(
+        'Could not select proof',
+        error.message ?? 'The file picker could not open.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -122,7 +164,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 Text(
                   'Purchase amount',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w800,
                   ),
@@ -147,10 +189,16 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                     if (amount == null || amount <= 0) {
                       return 'Enter a valid number';
                     }
-                    if (_sharePrice <= 0)
+                    if (_sharePrice <= 0) {
                       return 'Share price is not configured';
+                    }
                     if (amount < _sharePrice) {
                       return 'Amount must buy at least one share';
+                    }
+                    if (_paymentReferenceController.text.trim().isEmpty &&
+                        _noteController.text.trim().isEmpty &&
+                        _proofFilePath == null) {
+                      return 'Add an M-Pesa reference, proof text, or file';
                     }
                     return null;
                   },
@@ -159,14 +207,14 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 Text(
                   'Payment method',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 SizedBox(height: 8.h),
                 DropdownButtonFormField<String>(
-                  value: _paymentMethod,
+                  initialValue: _paymentMethod,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14.r),
@@ -187,7 +235,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 if (_requestedQuantity > 0) ...[
                   SizedBox(height: 10.h),
                   Text(
-                    '${_requestedQuantity} share${_requestedQuantity == 1 ? '' : 's'} will be purchased for ${_controller.currency.value} ${double.tryParse(_amountController.text.trim())?.toStringAsFixed(0) ?? '0'}',
+                    '$_requestedQuantity share${_requestedQuantity == 1 ? '' : 's'} will be purchased for ${_controller.currency.value} ${double.tryParse(_amountController.text.trim())?.toStringAsFixed(0) ?? '0'}',
                     style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 12.sp,
@@ -197,9 +245,29 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 ],
                 SizedBox(height: 18.h),
                 Text(
-                  'Notes',
+                  'M-Pesa reference or receipt number',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                TextFormField(
+                  controller: _paymentReferenceController,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. QWE123ABC',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14.r),
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                SizedBox(height: 18.h),
+                Text(
+                  'Proof details',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w800,
                   ),
@@ -210,11 +278,18 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                   minLines: 3,
                   maxLines: 5,
                   decoration: InputDecoration(
-                    hintText: 'Optional note for your purchase request',
+                    hintText:
+                        'Paste the SMS confirmation or describe the payment',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14.r),
                     ),
                   ),
+                ),
+                SizedBox(height: 12.h),
+                OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _pickProofFile,
+                  icon: const Icon(Icons.attach_file_rounded),
+                  label: Text(_proofFileName ?? 'Attach receipt or screenshot'),
                 ),
                 SizedBox(height: 28.h),
                 SizedBox(
@@ -232,7 +307,9 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                           )
                         : const Icon(Icons.check_circle_rounded),
                     label: Text(
-                      _isSubmitting ? 'Submitting...' : 'Submit request',
+                      _isSubmitting
+                          ? 'Submitting proof...'
+                          : 'Submit for approval',
                     ),
                     style: FilledButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: 16.h),
@@ -295,7 +372,7 @@ class _MemberContributionPageState extends State<MemberContributionPage> {
               Text(
                 'Contribution type',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w800,
                 ),
@@ -317,7 +394,11 @@ class _MemberContributionPageState extends State<MemberContributionPage> {
                             selectedColor: AppColors.primary.withValues(
                               alpha: .12,
                             ),
-                            side: BorderSide(color: AppColors.border),
+                            side: BorderSide(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                            ),
                           ),
                         )
                         .toList(),
@@ -326,7 +407,7 @@ class _MemberContributionPageState extends State<MemberContributionPage> {
               Text(
                 'Amount',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w800,
                 ),
@@ -356,7 +437,7 @@ class _MemberContributionPageState extends State<MemberContributionPage> {
               Text(
                 'Date',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w800,
                 ),
@@ -463,7 +544,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
                     Text(
                       'Loan estimate',
                       style: TextStyle(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12.sp,
                       ),
                     ),
@@ -471,7 +552,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
                     Text(
                       'Monthly repayment: TZS ${_monthlyEstimate()} ',
                       style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 18.sp,
                         fontWeight: FontWeight.w900,
                       ),
@@ -483,7 +564,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
               Text(
                 'Loan amount',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w800,
                 ),
@@ -513,7 +594,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
               Text(
                 'Purpose',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w800,
                 ),
@@ -538,7 +619,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
               Text(
                 'Repayment period (months)',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w800,
                 ),
@@ -631,7 +712,7 @@ class MemberMeetingsPage extends StatelessWidget {
       body: ListView.separated(
         padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 30.h),
         itemCount: demoMeetings.length,
-        separatorBuilder: (_, __) => SizedBox(height: 12.h),
+        separatorBuilder: (_, _) => SizedBox(height: 12.h),
         itemBuilder: (context, index) {
           final meeting = demoMeetings[index];
           final title = meeting['title'] as String;
@@ -646,9 +727,11 @@ class MemberMeetingsPage extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(16.w),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(18.r),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
               ),
               child: Row(
                 children: [
@@ -669,7 +752,7 @@ class MemberMeetingsPage extends StatelessWidget {
                         Text(
                           title,
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 14.sp,
                             fontWeight: FontWeight.w800,
                           ),
@@ -678,7 +761,9 @@ class MemberMeetingsPage extends StatelessWidget {
                         Text(
                           '$date • $time',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontSize: 11.sp,
                           ),
                         ),
@@ -772,7 +857,7 @@ class MemberMeetingDetailPage extends StatelessWidget {
             Text(
               'Venue',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w800,
               ),
@@ -780,13 +865,16 @@ class MemberMeetingDetailPage extends StatelessWidget {
             SizedBox(height: 6.h),
             Text(
               venue,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13.sp,
+              ),
             ),
             SizedBox(height: 22.h),
             Text(
               'Agenda',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w800,
               ),
@@ -795,7 +883,7 @@ class MemberMeetingDetailPage extends StatelessWidget {
             Text(
               agenda,
               style: TextStyle(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13.sp,
                 height: 1.6,
               ),

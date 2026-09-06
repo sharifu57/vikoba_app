@@ -38,7 +38,7 @@ class _MemberPageState extends State<MemberPage> {
             selectedIndex: selectedIndex,
             onDestinationSelected: (index) =>
                 setState(() => selectedIndex = index),
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             indicatorColor: AppColors.secondary.withValues(alpha: .24),
             destinations: const [
               NavigationDestination(
@@ -318,6 +318,7 @@ class _ContributionChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final values = points.map((point) => _number(point['amount'])).toList();
     final maxValue = values.isEmpty
         ? 100.0
@@ -352,9 +353,9 @@ class _ContributionChart extends StatelessWidget {
       height: 190.h,
       padding: EdgeInsets.fromLTRB(8.w, 18.h, 18.w, 8.h),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: values.isEmpty
           ? const _EmptyLine(text: 'Contribution trend will appear here.')
@@ -386,7 +387,10 @@ class _ActivityView extends StatelessWidget {
           SizedBox(height: 6.h),
           Text(
             'A clear record of what is happening in your group.',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13.sp,
+            ),
           ),
           SizedBox(height: 20.h),
           ...controller.activities.map(
@@ -411,6 +415,7 @@ class _ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      final colorScheme = Theme.of(context).colorScheme;
       final displayName = controller.memberName.value;
       final initials = displayName.trim().isEmpty
           ? 'M'
@@ -427,9 +432,9 @@ class _ProfileView extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(18.w),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colorScheme.surface,
               borderRadius: BorderRadius.circular(24.r),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: colorScheme.outlineVariant),
             ),
             child: Column(
               children: [
@@ -449,7 +454,7 @@ class _ProfileView extends StatelessWidget {
                 Text(
                   displayName,
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: colorScheme.onSurface,
                     fontSize: 22.sp,
                     fontWeight: FontWeight.w900,
                   ),
@@ -553,7 +558,7 @@ class _SectionTitle extends StatelessWidget {
       Text(
         title,
         style: TextStyle(
-          color: AppColors.textPrimary,
+          color: Theme.of(context).colorScheme.onSurface,
           fontSize: 15.sp,
           fontWeight: FontWeight.w900,
         ),
@@ -583,9 +588,9 @@ class _RoundButton extends StatelessWidget {
       width: 42.w,
       height: 42.w,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(15.r),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Icon(icon, color: AppColors.primary, size: 21.sp),
     ),
@@ -635,9 +640,9 @@ class _MetricCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: EdgeInsets.all(14.w),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18.r),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,13 +651,16 @@ class _MetricCard extends StatelessWidget {
         SizedBox(height: 11.h),
         Text(
           label,
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 10.sp),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 10.sp,
+          ),
         ),
         SizedBox(height: 4.h),
         Text(
           value,
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 14.sp,
             fontWeight: FontWeight.w900,
           ),
@@ -725,9 +733,11 @@ class _QuickAction extends StatelessWidget {
         width: 84.w,
         padding: EdgeInsets.all(12.w),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(18.r),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -738,7 +748,7 @@ class _QuickAction extends StatelessWidget {
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 10.sp,
                 fontWeight: FontWeight.w700,
               ),
@@ -757,6 +767,7 @@ class _MeetingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final title = meeting['title']?.toString() ?? 'Group meeting';
     final date = meeting['date']?.toString() ?? 'Upcoming';
     final venue = meeting['venue']?.toString() ?? 'Group venue';
@@ -766,9 +777,9 @@ class _MeetingTile extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(14.w),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(18.r),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: colorScheme.outlineVariant),
         ),
         child: Row(
           children: [
@@ -792,7 +803,7 @@ class _MeetingTile extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: colorScheme.onSurface,
                       fontSize: 12.sp,
                       fontWeight: FontWeight.w800,
                     ),
@@ -801,7 +812,7 @@ class _MeetingTile extends StatelessWidget {
                   Text(
                     '$date • $venue',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: colorScheme.onSurfaceVariant,
                       fontSize: 10.sp,
                     ),
                   ),
@@ -830,6 +841,7 @@ class _ProfileActionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.only(bottom: 10.h),
       child: InkWell(
@@ -838,10 +850,10 @@ class _ProfileActionItem extends StatelessWidget {
         child: Container(
           padding: EdgeInsets.all(14.w),
           decoration: BoxDecoration(
-            color: accent ? AppColors.primary : Colors.white,
+            color: accent ? AppColors.primary : colorScheme.surface,
             borderRadius: BorderRadius.circular(16.r),
             border: Border.all(
-              color: accent ? AppColors.primary : AppColors.border,
+              color: accent ? AppColors.primary : colorScheme.outlineVariant,
             ),
           ),
           child: Row(
@@ -856,7 +868,7 @@ class _ProfileActionItem extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: accent ? Colors.white : AppColors.textPrimary,
+                    color: accent ? Colors.white : colorScheme.onSurface,
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w800,
                   ),
@@ -864,7 +876,7 @@ class _ProfileActionItem extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: accent ? Colors.white : AppColors.textSecondary,
+                color: accent ? Colors.white : colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -882,6 +894,7 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final type =
         activity['type']?.toString().replaceAll('_', ' ') ?? 'Group payment';
     final description =
@@ -893,9 +906,9 @@ class _ActivityTile extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(13.w),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: colorScheme.outlineVariant),
         ),
         child: Row(
           children: [
@@ -920,7 +933,7 @@ class _ActivityTile extends StatelessWidget {
                   Text(
                     type,
                     style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: colorScheme.onSurface,
                       fontSize: 12.sp,
                       fontWeight: FontWeight.w800,
                     ),
@@ -931,7 +944,7 @@ class _ActivityTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: colorScheme.onSurfaceVariant,
                       fontSize: 10.sp,
                     ),
                   ),
@@ -962,7 +975,10 @@ class _EmptyLine extends StatelessWidget {
     child: Center(
       child: Text(
         text,
-        style: TextStyle(color: AppColors.textSecondary, fontSize: 12.sp),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          fontSize: 12.sp,
+        ),
       ),
     ),
   );
@@ -991,7 +1007,10 @@ class _ErrorView extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13.sp,
+            ),
           ),
           SizedBox(height: 18.h),
           FilledButton(onPressed: onRetry, child: const Text('Try again')),

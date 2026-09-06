@@ -100,4 +100,39 @@ class MemberDashboardApi {
     final data = body['data'];
     return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
   }
+
+  Future<Map<String, dynamic>> submitSharePurchaseProof(
+    int groupId, {
+    required int groupMemberId,
+    required int quantity,
+    required double amount,
+    required String paymentMethod,
+    String? paymentReference,
+    String? proofText,
+    String? proofFilePath,
+  }) async {
+    final form = FormData.fromMap({
+      'groupMemberId': groupMemberId,
+      'quantity': quantity,
+      'amount': amount,
+      'paymentMethod': paymentMethod,
+      if (paymentReference != null && paymentReference.trim().isNotEmpty)
+        'paymentReference': paymentReference.trim(),
+      if (proofText != null && proofText.trim().isNotEmpty)
+        'proofText': proofText.trim(),
+      if (proofFilePath != null)
+        'proofFile': await MultipartFile.fromFile(proofFilePath),
+    });
+    final response = await _dio.post(
+      AppConfig.sharePurchaseRequests(groupId),
+      data: form,
+      options: Options(extra: {'requiresAuth': true}),
+    );
+    final body = response.data;
+    if (body is! Map) {
+      throw const FormatException('Invalid share proof response.');
+    }
+    final data = body['data'];
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
 }
