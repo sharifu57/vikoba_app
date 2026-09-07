@@ -509,11 +509,6 @@ class _ProfileView extends StatelessWidget {
             onTap: () => Get.to(() => const MemberSharePurchasePage()),
           ),
           _ProfileActionItem(
-            label: 'Add contribution',
-            icon: Icons.add_circle_outline_rounded,
-            onTap: () => Get.to(() => const MemberContributionPage()),
-          ),
-          _ProfileActionItem(
             label: 'Request loan',
             icon: Icons.request_quote_outlined,
             onTap: () => Get.to(() => const MemberLoanRequestPage()),

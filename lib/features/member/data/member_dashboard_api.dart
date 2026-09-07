@@ -111,6 +111,7 @@ class MemberDashboardApi {
     String? paymentReference,
     String? proofText,
     String? proofFilePath,
+    double? jamiiAmount,
   }) async {
     final storedToken = await TokenStorage.getToken();
     final token = storedToken
@@ -128,6 +129,7 @@ class MemberDashboardApi {
       'quantity': quantity,
       'amount': amount,
       'paymentMethod': paymentMethod,
+      if (jamiiAmount != null && jamiiAmount > 0) 'jamiiAmount': jamiiAmount,
       if (paymentReference != null && paymentReference.trim().isNotEmpty)
         'paymentReference': paymentReference.trim(),
       if (proofText != null && proofText.trim().isNotEmpty)

@@ -18,6 +18,7 @@ class MemberSharePurchasePage extends StatefulWidget {
 class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
+  final _jamiiAmountController = TextEditingController();
   final _paymentReferenceController = TextEditingController();
   final _noteController = TextEditingController();
   String _paymentMethod = 'Cash';
@@ -38,9 +39,14 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
     return (amount / _sharePrice).floor();
   }
 
+  double get _configuredJamiiAmount => _number(
+    _controller.shareSummary['jamiiContributionPerSharePayment'],
+  );
+
   @override
   void dispose() {
     _amountController.dispose();
+    _jamiiAmountController.dispose();
     _paymentReferenceController.dispose();
     _noteController.dispose();
     super.dispose();
@@ -61,6 +67,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
         paymentReference: _paymentReferenceController.text.trim(),
         proofText: _noteController.text.trim(),
         proofFilePath: _proofFilePath,
+        jamiiAmount: double.tryParse(_jamiiAmountController.text.trim()),
       );
       if (!mounted) return;
       Get.snackbar(
@@ -203,6 +210,31 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                     }
                     return null;
                   },
+                ),
+                SizedBox(height: 18.h),
+                Text(
+                  'Jamii amount',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                TextFormField(
+                  controller: _jamiiAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    prefixText: '${_controller.currency.value} ',
+                    hintText: _configuredJamiiAmount > 0
+                        ? _configuredJamiiAmount.toStringAsFixed(0)
+                        : 'Optional amount',
+                    helperText: 'Separate from the share purchase amount.',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14.r),
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
                 ),
                 SizedBox(height: 18.h),
                 Text(

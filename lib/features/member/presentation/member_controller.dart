@@ -43,7 +43,8 @@ class MemberController extends GetxController {
       final sharePrice = _number(settings['sharePrice']);
       shareSummary.assignAll({
         'sharePrice': sharePrice,
-        'minimumContribution': _number(settings['minimumContribution']),
+        'minimumSharePurchaseAmount': _number(settings['minimumSharePurchaseAmount']),
+        'jamiiContributionPerSharePayment': _number(settings['jamiiContributionPerSharePayment']),
       });
       if (groupId == null || groupId <= 0) {
         throw Exception('No group is linked to this member account.');
@@ -137,6 +138,7 @@ class MemberController extends GetxController {
     String? paymentReference,
     String? proofText,
     String? proofFilePath,
+    double? jamiiAmount,
   }) async {
     final groupId = await TokenStorage.getCurrentGroupId();
     final memberId = _memberId;
@@ -156,6 +158,7 @@ class MemberController extends GetxController {
         paymentReference: paymentReference,
         proofText: proofText,
         proofFilePath: proofFilePath,
+        jamiiAmount: jamiiAmount,
       );
     } catch (error) {
       throw Exception(_message(error, operation: 'submit payment proof'));
