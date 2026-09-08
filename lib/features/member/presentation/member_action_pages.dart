@@ -39,9 +39,8 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
     return (amount / _sharePrice).floor();
   }
 
-  double get _configuredJamiiAmount => _number(
-    _controller.shareSummary['jamiiContributionPerSharePayment'],
-  );
+  double get _configuredJamiiAmount =>
+      _number(_controller.shareSummary['jamiiContributionPerSharePayment']);
 
   @override
   void dispose() {
@@ -223,7 +222,9 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 SizedBox(height: 8.h),
                 TextFormField(
                   controller: _jamiiAmountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     prefixText: '${_controller.currency.value} ',
                     hintText: _configuredJamiiAmount > 0
