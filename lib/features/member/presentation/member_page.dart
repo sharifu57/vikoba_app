@@ -701,7 +701,7 @@ class _QuickActionsRow extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: actions.length,
-        separatorBuilder: (_, __) => SizedBox(width: 10.w),
+        separatorBuilder: (_, _) => SizedBox(width: 10.w),
         itemBuilder: (context, index) => actions[index],
       ),
     );

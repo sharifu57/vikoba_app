@@ -43,8 +43,12 @@ class MemberController extends GetxController {
       final sharePrice = _number(settings['sharePrice']);
       shareSummary.assignAll({
         'sharePrice': sharePrice,
-        'minimumSharePurchaseAmount': _number(settings['minimumSharePurchaseAmount']),
-        'jamiiContributionPerSharePayment': _number(settings['jamiiContributionPerSharePayment']),
+        'minimumSharePurchaseAmount': _number(
+          settings['minimumSharePurchaseAmount'],
+        ),
+        'jamiiContributionPerSharePayment': _number(
+          settings['jamiiContributionPerSharePayment'],
+        ),
       });
       if (groupId == null || groupId <= 0) {
         throw Exception('No group is linked to this member account.');
@@ -194,8 +198,10 @@ class MemberController extends GetxController {
   Map<String, dynamic> get summary => _map(overview['summary']);
   Map<String, dynamic> get finance => _map(overview['finance']);
   Map<String, dynamic> get actions => _map(overview['actions']);
+
   List<Map<String, dynamic>> get contributionTrend =>
       _list(overview['contributionTrend']);
+
   List<Map<String, dynamic>> get activities =>
       _list(overview['recentActivities']);
   List<Map<String, dynamic>> get meetings => _list(overview['nextMeetings']);
@@ -226,6 +232,7 @@ class MemberController extends GetxController {
             .map((item) => Map<String, dynamic>.from(item))
             .toList()
       : <Map<String, dynamic>>[];
+      
   double _number(Object? value) => value is num
       ? value.toDouble()
       : double.tryParse(value?.toString() ?? '') ?? 0;
