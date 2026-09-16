@@ -90,6 +90,8 @@ class MemberController extends GetxController {
       shareSummary.assignAll({
         'sharePrice': unitPrice,
         'unitPrice': unitPrice,
+        'minimumSharePurchaseAmount': _number(settings['minimumSharePurchaseAmount']),
+        'jamiiContributionPerSharePayment': _number(settings['jamiiContributionPerSharePayment']),
         'totalShares': totalShares,
         'totalCapital': unitPrice * totalShares,
       });
@@ -136,7 +138,6 @@ class MemberController extends GetxController {
   }
 
   Future<void> submitSharePurchaseProof({
-    required int quantity,
     required double amount,
     required String paymentMethod,
     String? paymentReference,
@@ -156,7 +157,6 @@ class MemberController extends GetxController {
       await _api.submitSharePurchaseProof(
         groupId,
         groupMemberId: memberId,
-        quantity: quantity,
         amount: amount,
         paymentMethod: paymentMethod,
         paymentReference: paymentReference,
@@ -211,10 +211,10 @@ class MemberController extends GetxController {
     return value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
   }
 
-  int _calculateShareBalance(List<Map<String, dynamic>> ledger) {
-    var balance = 0;
+  double _calculateShareBalance(List<Map<String, dynamic>> ledger) {
+    var balance = 0.0;
     for (final entry in ledger) {
-      final quantity = _number(entry['quantity']).toInt();
+      final quantity = _number(entry['quantity']);
       final type = entry['type']?.toString().toUpperCase();
       balance += switch (type) {
         'REDEMPTION' || 'TRANSFER_OUT' => -quantity,

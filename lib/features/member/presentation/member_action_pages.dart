@@ -18,7 +18,6 @@ class MemberSharePurchasePage extends StatefulWidget {
 class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
-  final _jamiiAmountController = TextEditingController();
   final _paymentReferenceController = TextEditingController();
   final _noteController = TextEditingController();
   String _paymentMethod = 'Cash';
@@ -33,10 +32,10 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
         _controller.shareSummary['sharePrice'],
   );
 
-  int get _requestedQuantity {
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+  double get _requestedQuantity {
+    final amount = (double.tryParse(_amountController.text.trim()) ?? 0) - _configuredJamiiAmount;
     if (_sharePrice <= 0) return 0;
-    return (amount / _sharePrice).floor();
+    return amount > 0 ? amount / _sharePrice : 0;
   }
 
   double get _configuredJamiiAmount =>
@@ -45,7 +44,6 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
   @override
   void dispose() {
     _amountController.dispose();
-    _jamiiAmountController.dispose();
     _paymentReferenceController.dispose();
     _noteController.dispose();
     super.dispose();
@@ -56,22 +54,29 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
 
     final amount = double.parse(_amountController.text.trim());
     final quantity = _requestedQuantity;
+    if (_configuredJamiiAmount <= 0) {
+      Get.snackbar('Jamii is not configured', 'Ask your group admin to configure the Jamii amount first.');
+      return;
+    }
+    if (_proofFilePath == null) {
+      Get.snackbar('Proof required', 'Attach a receipt or payment screenshot.');
+      return;
+    }
     setState(() => _isSubmitting = true);
 
     try {
       await _controller.submitSharePurchaseProof(
-        quantity: quantity,
         amount: amount,
         paymentMethod: _paymentMethod,
         paymentReference: _paymentReferenceController.text.trim(),
         proofText: _noteController.text.trim(),
         proofFilePath: _proofFilePath,
-        jamiiAmount: double.tryParse(_jamiiAmountController.text.trim()),
+        jamiiAmount: _configuredJamiiAmount,
       );
       if (!mounted) return;
       Get.snackbar(
         'Proof submitted for review',
-        '$quantity share${quantity == 1 ? '' : 's'} await admin or accountant approval.',
+        '${quantity.toStringAsFixed(8)} shares await accountant and chair approval.',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: AppColors.primary,
         colorText: Colors.white,
@@ -169,7 +174,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 ),
                 SizedBox(height: 18.h),
                 Text(
-                  'Purchase amount',
+                  'Total payment amount',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14.sp,
@@ -199,13 +204,15 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                     if (_sharePrice <= 0) {
                       return 'Share price is not configured';
                     }
-                    if (amount < _sharePrice) {
-                      return 'Amount must buy at least one share';
+                    if (_configuredJamiiAmount <= 0) {
+                      return 'Ask your group admin to configure Jamii first';
                     }
-                    if (_paymentReferenceController.text.trim().isEmpty &&
-                        _noteController.text.trim().isEmpty &&
-                        _proofFilePath == null) {
-                      return 'Add an M-Pesa reference, proof text, or file';
+                    if (amount <= _configuredJamiiAmount) {
+                      return 'Total payment must be greater than Jamii';
+                    }
+                    final minimum = _number(_controller.shareSummary['minimumSharePurchaseAmount']);
+                    if (amount - _configuredJamiiAmount < minimum) {
+                      return 'Share amount after Jamii is below the minimum';
                     }
                     return null;
                   },
@@ -221,21 +228,16 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 ),
                 SizedBox(height: 8.h),
                 TextFormField(
-                  controller: _jamiiAmountController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  initialValue: _configuredJamiiAmount > 0 ? _configuredJamiiAmount.toStringAsFixed(2) : '',
+                  readOnly: true,
                   decoration: InputDecoration(
                     prefixText: '${_controller.currency.value} ',
-                    hintText: _configuredJamiiAmount > 0
-                        ? _configuredJamiiAmount.toStringAsFixed(0)
-                        : 'Optional amount',
-                    helperText: 'Separate from the share purchase amount.',
+                    hintText: 'Ask admin to configure Jamii',
+                    helperText: 'Deducted from the total payment before calculating shares.',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14.r),
                     ),
                   ),
-                  onChanged: (_) => setState(() {}),
                 ),
                 SizedBox(height: 18.h),
                 Text(
@@ -269,7 +271,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 if (_requestedQuantity > 0) ...[
                   SizedBox(height: 10.h),
                   Text(
-                    '$_requestedQuantity share${_requestedQuantity == 1 ? '' : 's'} will be purchased for ${_controller.currency.value} ${double.tryParse(_amountController.text.trim())?.toStringAsFixed(0) ?? '0'}',
+                    '${_controller.currency.value} ${_configuredJamiiAmount.toStringAsFixed(2)} Jamii + ${_controller.currency.value} ${((double.tryParse(_amountController.text.trim()) ?? 0) - _configuredJamiiAmount).toStringAsFixed(2)} shares = ${_requestedQuantity.toStringAsFixed(8)} shares',
                     style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 12.sp,

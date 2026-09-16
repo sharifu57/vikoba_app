@@ -105,7 +105,6 @@ class MemberDashboardApi {
   Future<Map<String, dynamic>> submitSharePurchaseProof(
     int groupId, {
     required int groupMemberId,
-    required int quantity,
     required double amount,
     required String paymentMethod,
     String? paymentReference,
@@ -126,7 +125,6 @@ class MemberDashboardApi {
 
     final form = FormData.fromMap({
       'groupMemberId': groupMemberId,
-      'quantity': quantity,
       'amount': amount,
       'paymentMethod': paymentMethod,
       if (jamiiAmount != null && jamiiAmount > 0) 'jamiiAmount': jamiiAmount,
