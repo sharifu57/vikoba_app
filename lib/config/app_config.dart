@@ -32,4 +32,34 @@ class AppConfig {
 
   static String sharePurchaseRequests(int groupId) =>
       "$baseUrl/api/share-purchase-requests/group/$groupId";
+
+  static String fines(int groupId) => "$baseUrl/api/fines?groupId=$groupId";
+
+  static String meetings(int groupId) =>
+      "$baseUrl/api/groups/$groupId/meetings";
+  static String meeting(int meetingId) => "$baseUrl/api/meetings/$meetingId";
+  static String meetingAttendance(int meetingId) =>
+      "${meeting(meetingId)}/attendance";
+
+  static String loans(int groupId) => "$baseUrl/api/loans/group/$groupId";
+  static String loanApplicationContext(int groupId) =>
+      "${loans(groupId)}/application-context";
+  static String loanApplications(int groupId) =>
+      "${loans(groupId)}/applications";
+  static String loanGuarantees(int groupId) =>
+      "${loans(groupId)}/guarantees/mine";
+  static String loanGuaranteeDecision(
+    int groupId,
+    int guaranteeId,
+    String decision,
+  ) => "${loans(groupId)}/guarantees/$guaranteeId/$decision";
+  static String replaceLoanGuarantor(
+    int groupId,
+    int loanId,
+    int guaranteeId,
+  ) => "${loans(groupId)}/$loanId/guarantors/$guaranteeId/replace";
+  static String loanDecision(int groupId, int loanId, String action) =>
+      "${loans(groupId)}/$loanId/$action";
+  static String loanSchedule(int groupId, int loanId) =>
+      "${loans(groupId)}/$loanId/schedule";
 }

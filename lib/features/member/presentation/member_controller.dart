@@ -16,6 +16,13 @@ class MemberController extends GetxController {
   final memberProfile = <String, dynamic>{}.obs;
   final shareSummary = <String, dynamic>{}.obs;
   final shareLedger = <Map<String, dynamic>>[].obs;
+  final memberFines = <Map<String, dynamic>>[].obs;
+  final groupMeetings = <Map<String, dynamic>>[].obs;
+  final meetingAttendance = <int, Map<String, dynamic>>{}.obs;
+  final loanContext = <String, dynamic>{}.obs;
+  final loanApplications = <Map<String, dynamic>>[].obs;
+  final guaranteeRequests = <Map<String, dynamic>>[].obs;
+  final loanSchedules = <int, List<Map<String, dynamic>>>{}.obs;
   final memberList = <Map<String, dynamic>>[].obs;
   final currentGroupRole = 'MEMBER'.obs;
   final currentGroupPermissions = <String>[].obs;
@@ -82,6 +89,18 @@ class MemberController extends GetxController {
                 )
                 .toList();
       shareLedger.assignAll(personalLedger);
+      final allFines = await _api.getFines(groupId);
+      memberFines.assignAll(
+        memberId == null
+            ? <Map<String, dynamic>>[]
+            : allFines
+                  .where(
+                    (fine) =>
+                        _number(fine['groupMemberId']).toInt() == memberId,
+                  )
+                  .toList(),
+      );
+      await loadLoanData(showError: false);
 
       final totalShares = _calculateShareBalance(personalLedger);
       final unitPrice = _number(
@@ -90,8 +109,12 @@ class MemberController extends GetxController {
       shareSummary.assignAll({
         'sharePrice': unitPrice,
         'unitPrice': unitPrice,
-        'minimumSharePurchaseAmount': _number(settings['minimumSharePurchaseAmount']),
-        'jamiiContributionPerSharePayment': _number(settings['jamiiContributionPerSharePayment']),
+        'minimumSharePurchaseAmount': _number(
+          settings['minimumSharePurchaseAmount'],
+        ),
+        'jamiiContributionPerSharePayment': _number(
+          settings['jamiiContributionPerSharePayment'],
+        ),
         'totalShares': totalShares,
         'totalCapital': unitPrice * totalShares,
       });
@@ -171,6 +194,146 @@ class MemberController extends GetxController {
     await loadDashboard(showError: false);
   }
 
+  Future<void> loadLoanData({bool showError = true}) async {
+    final groupId = await TokenStorage.getCurrentGroupId();
+    if (groupId == null || groupId <= 0) return;
+    Object? firstError;
+    try {
+      loanContext.assignAll(await _api.getLoanApplicationContext(groupId));
+    } catch (error) {
+      loanContext.clear();
+      firstError = error;
+    }
+    try {
+      loanApplications.assignAll(await _api.getLoans(groupId));
+    } catch (error) {
+      loanApplications.clear();
+      firstError ??= error;
+    }
+    try {
+      guaranteeRequests.assignAll(await _api.getGuaranteeRequests(groupId));
+    } catch (error) {
+      guaranteeRequests.clear();
+      firstError ??= error;
+    }
+    if (showError && firstError != null) {
+      throw Exception(_message(firstError, operation: 'load loan details'));
+    }
+  }
+
+  Future<void> loadMeetings() async {
+    final groupId = await TokenStorage.getCurrentGroupId();
+    if (groupId == null || groupId <= 0) return;
+    try {
+      groupMeetings.assignAll(await _api.getMeetings(groupId));
+    } catch (error) {
+      throw Exception(_message(error, operation: 'load your meetings'));
+    }
+  }
+
+  Future<Map<String, dynamic>> loadMeetingDetails(int meetingId) async {
+    try {
+      final meeting = await _api.getMeeting(meetingId);
+      final attendance = await _api.getMeetingAttendance(meetingId);
+      final mine = attendance.firstWhere(
+        (row) => _number(row['groupMemberId']).toInt() == _memberId,
+        orElse: () => <String, dynamic>{},
+      );
+      meetingAttendance[meetingId] = mine;
+      return meeting;
+    } catch (error) {
+      throw Exception(_message(error, operation: 'load meeting details'));
+    }
+  }
+
+  Future<void> applyForLoan({
+    required double amount,
+    required int durationMonths,
+    required String purpose,
+    required List<int> guarantorIds,
+  }) async {
+    final groupId = await TokenStorage.getCurrentGroupId();
+    if (groupId == null || groupId <= 0) throw Exception('No group selected.');
+    try {
+      await _api.applyForLoan(
+        groupId,
+        amount: amount,
+        durationMonths: durationMonths,
+        purpose: purpose,
+        guarantorIds: guarantorIds,
+      );
+      await loadLoanData();
+    } catch (error) {
+      throw Exception(
+        _message(error, operation: 'submit your loan application'),
+      );
+    }
+  }
+
+  Future<void> decideGuarantee(int guaranteeId, bool accept) async {
+    final groupId = await TokenStorage.getCurrentGroupId();
+    if (groupId == null || groupId <= 0) throw Exception('No group selected.');
+    try {
+      await _api.decideGuarantee(groupId, guaranteeId, accept);
+      await loadLoanData();
+    } catch (error) {
+      throw Exception(
+        _message(error, operation: 'save your guarantee decision'),
+      );
+    }
+  }
+
+  Future<void> replaceGuarantor(
+    int loanId,
+    int guaranteeId,
+    int replacementId,
+  ) async {
+    final groupId = await TokenStorage.getCurrentGroupId();
+    if (groupId == null || groupId <= 0) throw Exception('No group selected.');
+    try {
+      await _api.replaceGuarantor(groupId, loanId, guaranteeId, replacementId);
+      await loadLoanData();
+    } catch (error) {
+      throw Exception(_message(error, operation: 'replace the guarantor'));
+    }
+  }
+
+  Future<Map<String, dynamic>> reviewLoan(
+    int loanId,
+    String action, {
+    String? reason,
+  }) async {
+    final groupId = await TokenStorage.getCurrentGroupId();
+    if (groupId == null || groupId <= 0) throw Exception('No group selected.');
+    try {
+      final result = await _api.reviewLoan(
+        groupId,
+        loanId,
+        action,
+        reason: reason,
+      );
+      await loadLoanData();
+      if (result['status'] == 'ACTIVE') await loadLoanSchedule(loanId);
+      return result;
+    } catch (error) {
+      throw Exception(_message(error, operation: '$action this loan'));
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> loadLoanSchedule(int loanId) async {
+    final groupId = await TokenStorage.getCurrentGroupId();
+    if (groupId == null || groupId <= 0) return <Map<String, dynamic>>[];
+    try {
+      final rows = await _api.getLoanSchedule(groupId, loanId);
+      loanSchedules[loanId] = rows;
+      return rows;
+    } catch (error) {
+      throw Exception(
+        _message(error, operation: 'load the repayment schedule'),
+      );
+    }
+  }
+
   Future<void> logout() async {
     await TokenStorage.clear();
     Get.offAllNamed('/login');
@@ -211,6 +374,8 @@ class MemberController extends GetxController {
     return value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
   }
 
+  int? get currentMemberId => _memberId;
+
   double _calculateShareBalance(List<Map<String, dynamic>> ledger) {
     var balance = 0.0;
     for (final entry in ledger) {
@@ -232,7 +397,7 @@ class MemberController extends GetxController {
             .map((item) => Map<String, dynamic>.from(item))
             .toList()
       : <Map<String, dynamic>>[];
-      
+
   double _number(Object? value) => value is num
       ? value.toDouble()
       : double.tryParse(value?.toString() ?? '') ?? 0;

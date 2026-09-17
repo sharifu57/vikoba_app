@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import 'package:vikoba_app/app/constants/app_colors.dart';
 import 'package:vikoba_app/app/widgets/vikoba_logo.dart';
@@ -47,9 +48,9 @@ class _MemberPageState extends State<MemberPage> {
                 label: 'Home',
               ),
               NavigationDestination(
-                icon: Icon(Icons.receipt_long_outlined),
-                selectedIcon: Icon(Icons.receipt_long_rounded),
-                label: 'Activity',
+                icon: Icon(Icons.trending_up_outlined),
+                selectedIcon: Icon(Icons.trending_up_rounded),
+                label: 'Shares',
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_outline_rounded),
@@ -83,6 +84,17 @@ class _HomeView extends StatelessWidget {
         DateTime.now().hour,
         controller.memberName.value,
       );
+      final guaranteeCount = controller.guaranteeRequests
+          .where(
+            (request) =>
+                request['status']?.toString().toUpperCase() == 'PENDING',
+          )
+          .length;
+      final loanApprovalCount = controller.loanApplications
+          .where(
+            (loan) => loan['canApprove'] == true || loan['canDisburse'] == true,
+          )
+          .length;
 
       return RefreshIndicator(
         color: AppColors.primary,
@@ -96,12 +108,11 @@ class _HomeView extends StatelessWidget {
                 const Spacer(),
                 _RoundButton(
                   icon: Icons.notifications_none_rounded,
-                  onTap: () => Get.snackbar(
-                    'Notifications',
-                    'No new alerts right now.',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: AppColors.primary,
-                    colorText: Colors.white,
+                  badge: guaranteeCount + loanApprovalCount,
+                  onTap: () => Get.to(
+                    () => loanApprovalCount > 0
+                        ? const MemberLoanApplicationsPage()
+                        : const MemberGuaranteeRequestsPage(),
                   ),
                 ),
               ],
@@ -130,20 +141,10 @@ class _HomeView extends StatelessWidget {
             SizedBox(height: 20.h),
             _BalanceCard(controller: controller),
             SizedBox(height: 22.h),
-            _SectionTitle(title: 'Share history', action: 'This year'),
+            _SectionTitle(title: 'Share history', action: 'Last 6 months'),
             SizedBox(height: 12.h),
-            _ContributionChart(
-              points: controller.shareLedger
-                  .map(
-                    (entry) => {
-                      'month': (entry['transactionDate'] ?? '')
-                          .toString()
-                          .split('T')
-                          .first,
-                      'amount': _number(entry['totalAmount']),
-                    },
-                  )
-                  .toList(),
+            _ShareHistoryChart(
+              transactions: controller.shareLedger.toList(),
               currency: controller.currency.value,
             ),
             SizedBox(height: 22.h),
@@ -214,19 +215,6 @@ class _HomeView extends StatelessWidget {
               ...controller.meetings
                   .take(2)
                   .map((meeting) => _MeetingTile(meeting: meeting)),
-            SizedBox(height: 22.h),
-            _SectionTitle(title: 'Recent activity', action: 'See all'),
-            SizedBox(height: 10.h),
-            ...controller.activities
-                .take(4)
-                .map(
-                  (activity) => _ActivityTile(
-                    activity: activity,
-                    currency: controller.currency.value,
-                  ),
-                ),
-            if (controller.activities.isEmpty)
-              const _EmptyLine(text: 'Your group activity will appear here.'),
           ],
         ),
       );
@@ -311,57 +299,299 @@ class _BalanceCard extends StatelessWidget {
   }
 }
 
-class _ContributionChart extends StatelessWidget {
-  const _ContributionChart({required this.points, required this.currency});
-  final List<Map<String, dynamic>> points;
+class _ShareHistoryChart extends StatelessWidget {
+  const _ShareHistoryChart({
+    required this.transactions,
+    required this.currency,
+  });
+  final List<Map<String, dynamic>> transactions;
   final String currency;
+
+  List<_ShareMonthPoint> get _monthlyHistory {
+    final now = DateTime.now();
+    final months = List.generate(6, (index) {
+      final offset = 5 - index;
+      return DateTime(now.year, now.month - offset);
+    });
+    final totals = <String, double>{};
+    for (final transaction in transactions) {
+      final date = DateTime.tryParse(
+        transaction['transactionDate']?.toString() ?? '',
+      );
+      if (date == null) continue;
+      final key = '${date.year}-${date.month}';
+      totals[key] = (totals[key] ?? 0) + _number(transaction['totalAmount']);
+    }
+    return [
+      for (final month in months)
+        _ShareMonthPoint(
+          month: month,
+          amount: totals['${month.year}-${month.month}'] ?? 0,
+        ),
+    ];
+  }
+
+  String _compactMoney(double value) {
+    if (value >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+    }
+    if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+    }
+    return value.toStringAsFixed(0);
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final values = points.map((point) => _number(point['amount'])).toList();
+    final history = _monthlyHistory;
+    final values = history.map((point) => point.amount).toList();
+    final hasHistory = values.any((amount) => amount > 0);
+    final total = values.fold<double>(0, (sum, amount) => sum + amount);
+    final firstMonth = history.first.month;
+    final purchaseCount = transactions.where((transaction) {
+      final date = DateTime.tryParse(
+        transaction['transactionDate']?.toString() ?? '',
+      );
+      return date != null && !date.isBefore(firstMonth);
+    }).length;
     final maxValue = values.isEmpty
         ? 100.0
         : values.reduce((a, b) => a > b ? a : b);
-    final chart = LineChart(
-      LineChartData(
-        minY: 0,
-        maxY: maxValue == 0 ? 100 : maxValue * 1.2,
-        gridData: FlGridData(show: false),
-        borderData: FlBorderData(show: false),
-        titlesData: const FlTitlesData(show: false),
-        lineTouchData: const LineTouchData(enabled: false),
-        lineBarsData: [
-          LineChartBarData(
-            isCurved: true,
-            color: AppColors.primary,
-            barWidth: 3,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: AppColors.primary.withValues(alpha: .12),
-            ),
-            spots: [
-              for (var i = 0; i < values.length; i++)
-                FlSpot(i.toDouble(), values[i]),
-            ],
+    final chartMax = maxValue == 0 ? 100.0 : maxValue * 1.25;
+    final interval = chartMax / 4;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(16.w, 16.h, 14.w, 14.h),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24.r),
+        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: .06),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-    );
-    return Container(
-      height: 190.h,
-      padding: EdgeInsets.fromLTRB(8.w, 18.h, 18.w, 8.h),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: values.isEmpty
-          ? const _EmptyLine(text: 'Contribution trend will appear here.')
-          : chart,
+      child: hasHistory
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(9.w),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: .1),
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      child: Icon(
+                        Icons.show_chart_rounded,
+                        color: AppColors.primary,
+                        size: 20.sp,
+                      ),
+                    ),
+                    SizedBox(width: 10.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Last 6 months',
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '$currency ${NumberFormat('#,##0').format(total)}',
+                            style: TextStyle(
+                              color: colorScheme.onSurface,
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 9.w,
+                        vertical: 6.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withValues(alpha: .18),
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
+                      child: Text(
+                        '$purchaseCount purchases',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 9.sp,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 18.h),
+                SizedBox(
+                  height: 164.h,
+                  child: LineChart(
+                    LineChartData(
+                      minX: 0,
+                      maxX: (history.length - 1).toDouble(),
+                      minY: 0,
+                      maxY: chartMax,
+                      gridData: FlGridData(
+                        drawVerticalLine: false,
+                        horizontalInterval: interval,
+                        getDrawingHorizontalLine: (_) => FlLine(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: .55,
+                          ),
+                          strokeWidth: 1,
+                          dashArray: [4, 4],
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 35.w,
+                            interval: interval,
+                            getTitlesWidget: (value, _) => Text(
+                              _compactMoney(value),
+                              style: TextStyle(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 8.sp,
+                              ),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 26.h,
+                            interval: 1,
+                            getTitlesWidget: (value, _) {
+                              final index = value.round();
+                              if (index < 0 || index >= history.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: EdgeInsets.only(top: 8.h),
+                                child: Text(
+                                  DateFormat(
+                                    'MMM',
+                                  ).format(history[index].month),
+                                  style: TextStyle(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 9.sp,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      lineTouchData: LineTouchData(
+                        handleBuiltInTouches: true,
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (_) => AppColors.primary,
+                          getTooltipItems: (spots) => spots.map((spot) {
+                            final month = history[spot.x.round()].month;
+                            return LineTooltipItem(
+                              '${DateFormat('MMMM').format(month)}\n$currency ${NumberFormat('#,##0').format(spot.y)}',
+                              TextStyle(
+                                color: Colors.white,
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          isCurved: true,
+                          curveSmoothness: .28,
+                          color: AppColors.primary,
+                          barWidth: 3.5,
+                          isStrokeCapRound: true,
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (spot, _, _, _) =>
+                                FlDotCirclePainter(
+                                  radius: spot.y > 0 ? 3.5 : 2,
+                                  color: spot.y > 0
+                                      ? AppColors.secondary
+                                      : colorScheme.outlineVariant,
+                                  strokeWidth: 2,
+                                  strokeColor: colorScheme.surface,
+                                ),
+                          ),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                AppColors.primary.withValues(alpha: .22),
+                                AppColors.primary.withValues(alpha: .01),
+                              ],
+                            ),
+                          ),
+                          spots: [
+                            for (var i = 0; i < history.length; i++)
+                              FlSpot(i.toDouble(), history[i].amount),
+                          ],
+                        ),
+                      ],
+                    ),
+                    duration: const Duration(milliseconds: 650),
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
+              ],
+            )
+          : SizedBox(
+              height: 150.h,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.insights_rounded,
+                    size: 35.sp,
+                    color: AppColors.primary.withValues(alpha: .35),
+                  ),
+                  SizedBox(height: 10.h),
+                  const _EmptyLine(
+                    text: 'Your share purchase history will appear here.',
+                  ),
+                ],
+              ),
+            ),
     );
   }
+}
+
+class _ShareMonthPoint {
+  const _ShareMonthPoint({required this.month, required this.amount});
+
+  final DateTime month;
+  final double amount;
 }
 
 class _ActivityView extends StatelessWidget {
@@ -377,7 +607,7 @@ class _ActivityView extends StatelessWidget {
           const VikobaLogo(size: 42, showName: true, nameSize: 18),
           SizedBox(height: 30.h),
           Text(
-            'Activity',
+            'My shares',
             style: TextStyle(
               color: AppColors.primary,
               fontSize: 28.sp,
@@ -386,21 +616,21 @@ class _ActivityView extends StatelessWidget {
           ),
           SizedBox(height: 6.h),
           Text(
-            'A clear record of what is happening in your group.',
+            'Your share purchases and current share activity.',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 13.sp,
             ),
           ),
           SizedBox(height: 20.h),
-          ...controller.activities.map(
+          ...controller.shareLedger.map(
             (activity) => _ActivityTile(
               activity: activity,
               currency: controller.currency.value,
             ),
           ),
-          if (controller.activities.isEmpty)
-            const _EmptyLine(text: 'No recent activity yet.'),
+          if (controller.shareLedger.isEmpty)
+            const _EmptyLine(text: 'No share purchases yet.'),
         ],
       ),
     );
@@ -572,23 +802,53 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.onTap});
+  const _RoundButton({required this.icon, required this.onTap, this.badge = 0});
   final IconData icon;
   final VoidCallback onTap;
+  final int badge;
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(15.r),
-    child: Container(
-      width: 42.w,
-      height: 42.w,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(15.r),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        child: Container(
+          width: 42.w,
+          height: 42.w,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(15.r),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 21.sp),
+        ),
       ),
-      child: Icon(icon, color: AppColors.primary, size: 21.sp),
-    ),
+      if (badge > 0)
+        Positioned(
+          right: -4.w,
+          top: -5.h,
+          child: Container(
+            constraints: BoxConstraints(minWidth: 18.w, minHeight: 18.w),
+            padding: EdgeInsets.symmetric(horizontal: 4.w),
+            decoration: const BoxDecoration(
+              color: AppColors.error,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              badge > 9 ? '9+' : '$badge',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 9.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+    ],
   );
 }
 
@@ -672,14 +932,6 @@ class _QuickActionsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       _QuickAction(
-        title: 'Add\ncontribution',
-        icon: Icons.add_circle_rounded,
-        onTap: () => Get.snackbar(
-          'Contribution',
-          'Contribution entry is ready to be added.',
-        ),
-      ),
-      _QuickAction(
         title: 'Buy\nshares',
         icon: Icons.trending_up_rounded,
         onTap: () => Get.to(() => const MemberSharePurchasePage()),
@@ -690,9 +942,19 @@ class _QuickActionsRow extends StatelessWidget {
         onTap: () => Get.to(() => const MemberLoanRequestPage()),
       ),
       _QuickAction(
+        title: 'Fines',
+        icon: Icons.gavel_rounded,
+        onTap: () => Get.to(() => const MemberFinesPage()),
+      ),
+      _QuickAction(
         title: 'Meetings',
         icon: Icons.event_available_rounded,
         onTap: () => Get.to(() => const MemberMeetingsPage()),
+      ),
+      _QuickAction(
+        title: 'Loan\nworkflow',
+        icon: Icons.account_tree_rounded,
+        onTap: () => Get.to(() => const MemberLoanApplicationsPage()),
       ),
     ];
 
@@ -764,57 +1026,63 @@ class _MeetingTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final title = meeting['title']?.toString() ?? 'Group meeting';
-    final date = meeting['date']?.toString() ?? 'Upcoming';
-    final venue = meeting['venue']?.toString() ?? 'Group venue';
+    final date = meeting['meetingDate']?.toString() ?? 'Upcoming';
+    final time = meeting['startTime']?.toString() ?? '';
+    final venue = meeting['location']?.toString() ?? 'Group venue';
 
     return Padding(
       padding: EdgeInsets.only(bottom: 10.h),
-      child: Container(
-        padding: EdgeInsets.all(14.w),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(18.r),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42.w,
-              height: 42.w,
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: .2),
-                borderRadius: BorderRadius.circular(12.r),
+      child: InkWell(
+        onTap: () => Get.to(() => MemberMeetingDetailPage(meeting: meeting)),
+        borderRadius: BorderRadius.circular(18.r),
+        child: Container(
+          padding: EdgeInsets.all(14.w),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(18.r),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42.w,
+                height: 42.w,
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: .2),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Icon(
+                  Icons.calendar_month_rounded,
+                  color: AppColors.primary,
+                ),
               ),
-              child: Icon(
-                Icons.calendar_month_rounded,
-                color: AppColors.primary,
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w800,
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    '$date • $venue',
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: 10.sp,
+                    SizedBox(height: 4.h),
+                    Text(
+                      '$date${time.isEmpty ? '' : ' · $time'} • $venue',
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 10.sp,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
         ),
       ),
     );
@@ -947,7 +1215,7 @@ class _ActivityTile extends StatelessWidget {
               ),
             ),
             Text(
-              _money(activity['amount'], currency),
+              _money(activity['totalAmount'] ?? activity['amount'], currency),
               style: TextStyle(
                 color: AppColors.primary,
                 fontSize: 11.sp,
