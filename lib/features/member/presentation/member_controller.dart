@@ -6,7 +6,10 @@ import 'package:vikoba_app/core/storage/token_storage.dart';
 import 'package:vikoba_app/features/member/data/member_dashboard_api.dart';
 
 class MemberController extends GetxController {
-  late final MemberDashboardApi _api;
+  MemberController({MemberDashboardApi? api})
+    : _api = api ?? MemberDashboardApi(AppClient.dio);
+
+  final MemberDashboardApi _api;
   final isLoading = true.obs;
   final errorMessage = RxnString();
   final groupName = 'Vikoba group'.obs;
@@ -23,14 +26,13 @@ class MemberController extends GetxController {
   final loanApplications = <Map<String, dynamic>>[].obs;
   final guaranteeRequests = <Map<String, dynamic>>[].obs;
   final loanSchedules = <int, List<Map<String, dynamic>>>{}.obs;
-  final memberList = <Map<String, dynamic>>[].obs;
+  final shareRequests = <Map<String, dynamic>>[].obs;
   final currentGroupRole = 'MEMBER'.obs;
   final currentGroupPermissions = <String>[].obs;
 
   @override
   void onInit() {
     super.onInit();
-    _api = MemberDashboardApi(AppClient.dio);
     loadDashboard();
   }
 
@@ -46,63 +48,40 @@ class MemberController extends GetxController {
       currentGroupPermissions.assignAll(
         await TokenStorage.getCurrentGroupPermissions(),
       );
-      final settings = await TokenStorage.getCurrentGroupSettings();
-      final sharePrice = _number(settings['sharePrice']);
-      shareSummary.assignAll({
-        'sharePrice': sharePrice,
-        'minimumSharePurchaseAmount': _number(
-          settings['minimumSharePurchaseAmount'],
-        ),
-        'jamiiContributionPerSharePayment': _number(
-          settings['jamiiContributionPerSharePayment'],
-        ),
-      });
       if (groupId == null || groupId <= 0) {
         throw Exception('No group is linked to this member account.');
       }
-      overview.assignAll(await _api.getOverview(groupId));
-      memberList.assignAll(await _api.getMembersByGroup(groupId));
-      final latestShareSummary = await _api.getShareSummary(groupId);
-      final savedPhone = (await TokenStorage.getPhone()) ?? '';
-      final savedName = (await TokenStorage.getDisplayName()).trim();
-      final activeMember = memberList.firstWhere((member) {
-        final phone = (member['phone'] ?? '').toString().trim();
-        final fullName =
-            (member['fullName'] ??
-                    '${member['firstName'] ?? ''} ${member['lastName'] ?? ''}')
-                .toString()
-                .trim();
-        return phone == savedPhone || fullName == savedName;
-      }, orElse: () => <String, dynamic>{});
-      if (activeMember.isNotEmpty) {
-        memberProfile.assignAll(activeMember);
-      }
-
+      await loadSharePurchaseSettings();
+      // The server identifies the signed-in membership; names are not identities.
+      memberProfile.clear();
+      overview.clear();
+      shareLedger.clear();
+      shareRequests.clear();
+      memberFines.clear();
+      meetingAttendance.clear();
+      loanApplications.clear();
+      memberProfile.assignAll(await _api.getMyMembership(groupId));
       final memberId = _memberId;
+      if (memberId == null || memberId <= 0) {
+        throw Exception('Your member profile could not be identified.');
+      }
+      overview.assignAll(await _api.getOverview(memberId));
+      memberFines.assignAll(_list(overview['fines']));
+      for (final row in _list(overview['meetingAttendance'])) {
+        final id = _number(row['meetingId']).toInt();
+        if (id > 0) meetingAttendance[id] = row;
+      }
+      final latestShareSummary = await _api.getShareSummary(groupId);
       final ledger = await _api.getShareLedger(groupId);
-      final personalLedger = memberId == null
-          ? <Map<String, dynamic>>[]
-          : ledger
-                .where(
-                  (entry) =>
-                      _number(entry['groupMemberId']).toInt() == memberId,
-                )
-                .toList();
-      shareLedger.assignAll(personalLedger);
-      final allFines = await _api.getFines(groupId);
-      memberFines.assignAll(
-        memberId == null
-            ? <Map<String, dynamic>>[]
-            : allFines
-                  .where(
-                    (fine) =>
-                        _number(fine['groupMemberId']).toInt() == memberId,
-                  )
-                  .toList(),
+      shareLedger.assignAll(
+        ledger.where(
+          (entry) => _number(entry['groupMemberId']).toInt() == memberId,
+        ),
       );
+      shareRequests.assignAll(await _api.getShareRequests(groupId));
       await loadLoanData(showError: false);
 
-      final totalShares = _calculateShareBalance(personalLedger);
+      final totalShares = _number(overview['sharesOwned']);
       final unitPrice = _number(
         latestShareSummary['unitPrice'] ?? shareSummary['sharePrice'],
       );
@@ -110,10 +89,10 @@ class MemberController extends GetxController {
         'sharePrice': unitPrice,
         'unitPrice': unitPrice,
         'minimumSharePurchaseAmount': _number(
-          settings['minimumSharePurchaseAmount'],
+          shareSummary['minimumSharePurchaseAmount'],
         ),
         'jamiiContributionPerSharePayment': _number(
-          settings['jamiiContributionPerSharePayment'],
+          shareSummary['jamiiContributionPerSharePayment'],
         ),
         'totalShares': totalShares,
         'totalCapital': unitPrice * totalShares,
@@ -127,37 +106,21 @@ class MemberController extends GetxController {
     }
   }
 
-  Future<void> purchaseShares({
-    required int quantity,
-    required double amount,
-    String paymentMethod = 'Cash',
-    String? reference,
-  }) async {
+  Future<void> loadSharePurchaseSettings() async {
     final groupId = await TokenStorage.getCurrentGroupId();
-    if (groupId == null || groupId <= 0) {
-      throw Exception('No group selected for share purchase.');
-    }
-
-    final memberId = _memberId;
-
-    if (memberId == null) {
-      throw Exception('Your member profile could not be identified.');
-    }
-
-    try {
-      await _api.purchaseShares(
-        groupId,
-        groupMemberId: memberId,
-        quantity: quantity,
-        amount: amount,
-        paymentMethod: paymentMethod,
-        reference: reference,
-      );
-    } catch (error) {
-      throw Exception(_message(error));
-    }
-
-    await loadDashboard();
+    if (groupId == null || groupId <= 0) throw Exception('No group selected.');
+    final result = await _api.getGroupSettings(groupId);
+    final settings = _map(result['settings']);
+    shareSummary.addAll({
+      'sharePrice': _number(settings['sharePrice']),
+      'unitPrice': _number(settings['sharePrice']),
+      'minimumSharePurchaseAmount': _number(
+        settings['minimumSharePurchaseAmount'],
+      ),
+      'jamiiContributionPerSharePayment': _number(
+        settings['jamiiContributionPerSharePayment'],
+      ),
+    });
   }
 
   Future<void> submitSharePurchaseProof({
@@ -166,7 +129,6 @@ class MemberController extends GetxController {
     String? paymentReference,
     String? proofText,
     String? proofFilePath,
-    double? jamiiAmount,
   }) async {
     final groupId = await TokenStorage.getCurrentGroupId();
     final memberId = _memberId;
@@ -179,13 +141,11 @@ class MemberController extends GetxController {
     try {
       await _api.submitSharePurchaseProof(
         groupId,
-        groupMemberId: memberId,
         amount: amount,
         paymentMethod: paymentMethod,
         paymentReference: paymentReference,
         proofText: proofText,
         proofFilePath: proofFilePath,
-        jamiiAmount: jamiiAmount,
       );
     } catch (error) {
       throw Exception(_message(error, operation: 'submit payment proof'));
@@ -205,7 +165,14 @@ class MemberController extends GetxController {
       firstError = error;
     }
     try {
-      loanApplications.assignAll(await _api.getLoans(groupId));
+      final rows = await _api.getLoans(groupId);
+      loanApplications.assignAll(
+        rows.where(
+          (loan) =>
+              _memberId != null &&
+              _number(loan['groupMemberId']).toInt() == _memberId,
+        ),
+      );
     } catch (error) {
       loanApplications.clear();
       firstError ??= error;
@@ -298,25 +265,17 @@ class MemberController extends GetxController {
     }
   }
 
-  Future<Map<String, dynamic>> reviewLoan(
-    int loanId,
-    String action, {
-    String? reason,
-  }) async {
+  Future<Map<String, dynamic>> cancelLoan(int loanId, {String? reason}) async {
     final groupId = await TokenStorage.getCurrentGroupId();
     if (groupId == null || groupId <= 0) throw Exception('No group selected.');
     try {
-      final result = await _api.reviewLoan(
-        groupId,
-        loanId,
-        action,
-        reason: reason,
-      );
+      final result = await _api.cancelLoan(groupId, loanId, reason: reason);
       await loadLoanData();
-      if (result['status'] == 'ACTIVE') await loadLoanSchedule(loanId);
       return result;
     } catch (error) {
-      throw Exception(_message(error, operation: '$action this loan'));
+      throw Exception(
+        _message(error, operation: 'cancel your loan application'),
+      );
     }
   }
 
@@ -341,7 +300,7 @@ class MemberController extends GetxController {
 
   String _message(
     Object error, {
-    String operation = 'load your group dashboard',
+    String operation = 'load your member dashboard',
   }) {
     if (error is DioException) {
       final data = error.response?.data;
@@ -367,7 +326,8 @@ class MemberController extends GetxController {
 
   List<Map<String, dynamic>> get activities =>
       _list(overview['recentActivities']);
-  List<Map<String, dynamic>> get meetings => _list(overview['nextMeetings']);
+  List<Map<String, dynamic>> get meetings =>
+      _list(overview['upcomingMeetings']);
 
   int? get _memberId {
     final value = memberProfile['id'] ?? memberProfile['groupMemberId'];
@@ -375,19 +335,6 @@ class MemberController extends GetxController {
   }
 
   int? get currentMemberId => _memberId;
-
-  double _calculateShareBalance(List<Map<String, dynamic>> ledger) {
-    var balance = 0.0;
-    for (final entry in ledger) {
-      final quantity = _number(entry['quantity']);
-      final type = entry['type']?.toString().toUpperCase();
-      balance += switch (type) {
-        'REDEMPTION' || 'TRANSFER_OUT' => -quantity,
-        _ => quantity,
-      };
-    }
-    return balance;
-  }
 
   Map<String, dynamic> _map(Object? value) =>
       value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};

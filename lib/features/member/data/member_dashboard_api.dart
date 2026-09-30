@@ -1,3 +1,4 @@
+import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
 import 'package:dio/dio.dart';
 
 import 'package:vikoba_app/config/app_config.dart';
@@ -8,42 +9,52 @@ class MemberDashboardApi {
 
   final Dio _dio;
 
-  Future<Map<String, dynamic>> getOverview(int groupId) async {
-    final response = await _dio.get(
-      AppConfig.dashboardGroup(groupId),
-      options: Options(extra: {'requiresAuth': true}),
-    );
-    final body = response.data;
-    if (body is! Map) {
-      throw const FormatException('Invalid dashboard response.');
-    }
-    final data = body['data'];
-    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-  }
+  Options get _freshReadOptions => Options(
+    extra: {
+      ...CacheOptions(store: null, policy: CachePolicy.noCache).toExtra(),
+      'requiresAuth': true,
+    },
+  );
 
-  Future<List<Map<String, dynamic>>> getMembersByGroup(int groupId) async {
-    final response = await _dio.get(
-      AppConfig.groupMembers(groupId),
-      options: Options(extra: {'requiresAuth': true}),
-    );
-    final body = response.data;
-    if (body is! Map) {
-      throw const FormatException('Invalid members response.');
-    }
+  Future<Map<String, dynamic>> getGroupSettings(int groupId) async =>
+      _mapResponse(
+        await _dio.get(
+          AppConfig.groupSettings(groupId),
+          options: _freshReadOptions,
+        ),
+        'group settings',
+      );
 
-    final data = body['data'];
-    if (data is! List) return <Map<String, dynamic>>[];
+  Future<Map<String, dynamic>> getMyMembership(int groupId) async =>
+      _mapResponse(
+        await _dio.get(
+          AppConfig.myMembership(groupId),
+          options: Options(extra: {'requiresAuth': true}),
+        ),
+        'membership',
+      );
 
-    return data
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
-  }
+  Future<Map<String, dynamic>> getOverview(int memberId) async => _mapResponse(
+    await _dio.get(
+      AppConfig.memberOverview(memberId),
+      options: _freshReadOptions,
+    ),
+    'member dashboard',
+  );
+
+  Future<List<Map<String, dynamic>>> getShareRequests(int groupId) async =>
+      _listResponse(
+        await _dio.get(
+          '${AppConfig.sharePurchaseRequests(groupId)}/mine',
+          options: _freshReadOptions,
+        ),
+        'share requests',
+      );
 
   Future<Map<String, dynamic>> getShareSummary(int groupId) async {
     final response = await _dio.get(
       AppConfig.shareSummary(groupId),
-      options: Options(extra: {'requiresAuth': true}),
+      options: _freshReadOptions,
     );
     final body = response.data;
     if (body is! Map) {
@@ -56,7 +67,7 @@ class MemberDashboardApi {
   Future<List<Map<String, dynamic>>> getShareLedger(int groupId) async {
     final response = await _dio.get(
       AppConfig.shareLedger(groupId),
-      options: Options(extra: {'requiresAuth': true}),
+      options: _freshReadOptions,
     );
     final body = response.data;
     if (body is! Map) {
@@ -66,21 +77,6 @@ class MemberDashboardApi {
     final data = body['data'];
     if (data is! List) return <Map<String, dynamic>>[];
 
-    return data
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
-  }
-
-  Future<List<Map<String, dynamic>>> getFines(int groupId) async {
-    final response = await _dio.get(
-      AppConfig.fines(groupId),
-      options: Options(extra: {'requiresAuth': true}),
-    );
-    final body = response.data;
-    if (body is! Map) throw const FormatException('Invalid fines response.');
-    final data = body['data'];
-    if (data is! List) return <Map<String, dynamic>>[];
     return data
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
@@ -192,18 +188,17 @@ class MemberDashboardApi {
     'guarantor replacement',
   );
 
-  Future<Map<String, dynamic>> reviewLoan(
+  Future<Map<String, dynamic>> cancelLoan(
     int groupId,
-    int loanId,
-    String action, {
+    int loanId, {
     String? reason,
   }) async => _mapResponse(
     await _dio.post(
-      AppConfig.loanDecision(groupId, loanId, action),
+      AppConfig.loanDecision(groupId, loanId, 'cancel'),
       data: reason == null ? <String, dynamic>{} : {'rejectionReason': reason},
       options: Options(extra: {'requiresAuth': true}),
     ),
-    'loan workflow decision',
+    'loan cancellation',
   );
 
   Future<List<Map<String, dynamic>>> getLoanSchedule(
@@ -235,45 +230,13 @@ class MemberDashboardApi {
     return data.whereType<Map>().map(Map<String, dynamic>.from).toList();
   }
 
-  Future<Map<String, dynamic>> purchaseShares(
-    int groupId, {
-    required int groupMemberId,
-    required int quantity,
-    required double amount,
-    required String paymentMethod,
-    String? reference,
-  }) async {
-    final response = await _dio.post(
-      AppConfig.purchaseShares(groupId),
-      data: {
-        'groupMemberId': groupMemberId,
-        'quantity': quantity,
-        'amount': amount,
-        'paymentMethod': paymentMethod,
-        if (reference != null && reference.trim().isNotEmpty)
-          'reference': reference.trim(),
-      },
-      options: Options(extra: {'requiresAuth': true}),
-    );
-
-    final body = response.data;
-    if (body is! Map) {
-      throw const FormatException('Invalid share purchase response.');
-    }
-
-    final data = body['data'];
-    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-  }
-
   Future<Map<String, dynamic>> submitSharePurchaseProof(
     int groupId, {
-    required int groupMemberId,
     required double amount,
     required String paymentMethod,
     String? paymentReference,
     String? proofText,
     String? proofFilePath,
-    double? jamiiAmount,
   }) async {
     final storedToken = await TokenStorage.getToken();
     final token = storedToken
@@ -287,16 +250,23 @@ class MemberDashboardApi {
     }
 
     final form = FormData.fromMap({
-      'groupMemberId': groupMemberId,
       'amount': amount,
       'paymentMethod': paymentMethod,
-      if (jamiiAmount != null && jamiiAmount > 0) 'jamiiAmount': jamiiAmount,
       if (paymentReference != null && paymentReference.trim().isNotEmpty)
         'paymentReference': paymentReference.trim(),
       if (proofText != null && proofText.trim().isNotEmpty)
         'proofText': proofText.trim(),
       if (proofFilePath != null)
-        'proofFile': await MultipartFile.fromFile(proofFilePath),
+        'proofFile': await MultipartFile.fromFile(
+          proofFilePath,
+          contentType: DioMediaType.parse(
+            proofFilePath.toLowerCase().endsWith('.pdf')
+                ? 'application/pdf'
+                : proofFilePath.toLowerCase().endsWith('.png')
+                ? 'image/png'
+                : 'image/jpeg',
+          ),
+        ),
     });
     final response = await _dio.post(
       AppConfig.sharePurchaseRequests(groupId),

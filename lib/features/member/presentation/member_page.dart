@@ -1,3 +1,4 @@
+import 'package:vikoba_app/core/formatters/money_formatter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -90,12 +91,6 @@ class _HomeView extends StatelessWidget {
                 request['status']?.toString().toUpperCase() == 'PENDING',
           )
           .length;
-      final loanApprovalCount = controller.loanApplications
-          .where(
-            (loan) => loan['canApprove'] == true || loan['canDisburse'] == true,
-          )
-          .length;
-
       return RefreshIndicator(
         color: AppColors.primary,
         onRefresh: controller.loadDashboard,
@@ -108,12 +103,9 @@ class _HomeView extends StatelessWidget {
                 const Spacer(),
                 _RoundButton(
                   icon: Icons.notifications_none_rounded,
-                  badge: guaranteeCount + loanApprovalCount,
-                  onTap: () => Get.to(
-                    () => loanApprovalCount > 0
-                        ? const MemberLoanApplicationsPage()
-                        : const MemberGuaranteeRequestsPage(),
-                  ),
+                  badge: guaranteeCount,
+                  onTap: () =>
+                      Get.to(() => const MemberGuaranteeRequestsPage()),
                 ),
               ],
             ),
@@ -407,7 +399,7 @@ class _ShareHistoryChart extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '$currency ${NumberFormat('#,##0').format(total)}',
+                            formatMoney(total, currency: currency),
                             style: TextStyle(
                               color: colorScheme.onSurface,
                               fontSize: 18.sp,
@@ -513,7 +505,7 @@ class _ShareHistoryChart extends StatelessWidget {
                           getTooltipItems: (spots) => spots.map((spot) {
                             final month = history[spot.x.round()].month;
                             return LineTooltipItem(
-                              '${DateFormat('MMMM').format(month)}\n$currency ${NumberFormat('#,##0').format(spot.y)}',
+                              '${DateFormat('MMMM').format(month)}\n${formatMoney(spot.y, currency: currency)}',
                               TextStyle(
                                 color: Colors.white,
                                 fontSize: 10.sp,
@@ -623,6 +615,32 @@ class _ActivityView extends StatelessWidget {
             ),
           ),
           SizedBox(height: 20.h),
+          ...controller.shareRequests.map(
+            (request) => Card(
+              child: ListTile(
+                title: Text(
+                  '${request['quantity'] ?? 0} shares - ${request['status'] ?? 'PENDING'}',
+                ),
+                subtitle: Text(
+                  [
+                    '${_money(request['amount'], controller.currency.value)} shares + ${_money(request['jamiiAmount'], controller.currency.value)} Jamii',
+                    if (request['submittedAt'] != null)
+                      request['submittedAt'].toString(),
+                    if (request['reviewReason'] != null)
+                      request['reviewReason'].toString(),
+                  ].join('\n'),
+                ),
+                trailing: Text(
+                  _money(
+                    _number(request['amount']) +
+                        _number(request['jamiiAmount']),
+                    controller.currency.value,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 12.h),
           ...controller.shareLedger.map(
             (activity) => _ActivityTile(
               activity: activity,
@@ -952,7 +970,7 @@ class _QuickActionsRow extends StatelessWidget {
         onTap: () => Get.to(() => const MemberMeetingsPage()),
       ),
       _QuickAction(
-        title: 'Loan\nworkflow',
+        title: 'My\nloans',
         icon: Icons.account_tree_rounded,
         onTap: () => Get.to(() => const MemberLoanApplicationsPage()),
       ),
@@ -1284,7 +1302,7 @@ class _ErrorView extends StatelessWidget {
 }
 
 String _money(Object? value, String currency) =>
-    '$currency ${_number(value).toStringAsFixed(0)}';
+    formatMoney(value, currency: currency);
 double _number(Object? value) => value is num
     ? value.toDouble()
     : double.tryParse(value?.toString() ?? '') ?? 0;

@@ -17,11 +17,19 @@ class AppConfig {
   static String get logout => "$auth/logout";
   static String get shares => "$baseUrl/api/shares";
 
-  static String dashboardGroup(int groupId) =>
-      "$baseUrl/api/dashboard/group/$groupId";
+  static String memberOverview(int memberId) =>
+      "$baseUrl/api/members/$memberId/360";
+
+  static String myMembership(int groupId) =>
+      "$baseUrl/api/members/group/$groupId/my-access";
 
   static String groupMembers(int groupId) =>
       "$baseUrl/api/members/group/$groupId";
+
+  static String member360(int groupMemberId) =>
+      "$baseUrl/api/members/$groupMemberId/360";
+
+  static String groupSettings(int groupId) => "$baseUrl/api/groups/$groupId";
 
   static String shareSummary(int groupId) => "$shares/group/$groupId/summary";
 

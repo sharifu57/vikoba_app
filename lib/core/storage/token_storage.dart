@@ -145,6 +145,13 @@ class TokenStorage {
         'current_group_id',
         (group['groupId'] as num?)?.toInt() ?? 0,
       );
+      final groupMemberId = (primary['id'] ??
+              primary['groupMemberId'] ??
+              primary['membershipId'] as num?)
+          ?.toInt();
+      if (groupMemberId != null && groupMemberId > 0) {
+        await prefs.setInt('current_group_member_id', groupMemberId);
+      }
       await prefs.setString(
         'current_group_name',
         group['groupName'] ?? 'Vikoba group',
@@ -361,6 +368,24 @@ class TokenStorage {
   static Future<int?> getCurrentGroupId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('current_group_id');
+  }
+
+  static Future<int?> getCurrentGroupMemberId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('current_group_member_id');
+  }
+
+  static Future<List<Map<String, dynamic>>> getGroups() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('groups');
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return List<Map<String, dynamic>>.from(decoded.whereType<Map>());
+      }
+    } catch (_) {}
+    return [];
   }
 
   static Future<String> getCurrentGroupName() async {

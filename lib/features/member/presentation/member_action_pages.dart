@@ -1,3 +1,5 @@
+import 'package:vikoba_app/core/formatters/money_input_formatter.dart';
+import 'package:vikoba_app/core/formatters/money_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -20,7 +22,9 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
   final _amountController = TextEditingController();
   final _paymentReferenceController = TextEditingController();
   final _noteController = TextEditingController();
-  String _paymentMethod = 'Cash';
+  String _paymentMethod = 'Mobile Money';
+  bool _loadingSettings = true;
+  String? _settingsError;
   bool _isSubmitting = false;
   String? _proofFilePath;
   String? _proofFileName;
@@ -34,14 +38,62 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
 
   double get _requestedQuantity {
     final amount =
-        (double.tryParse(_amountController.text.trim()) ?? 0) -
-        _configuredJamiiAmount;
+        (parseMoneyInput(_amountController.text) ?? 0) - _configuredJamiiAmount;
     if (_sharePrice <= 0) return 0;
     return amount > 0 ? amount / _sharePrice : 0;
   }
 
   double get _configuredJamiiAmount =>
       _number(_controller.shareSummary['jamiiContributionPerSharePayment']);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() {
+      _loadingSettings = true;
+      _settingsError = null;
+    });
+    try {
+      await _controller.loadSharePurchaseSettings();
+    } catch (_) {
+      if (mounted) {
+        _settingsError =
+            'Unable to load current share and Jamii settings. Please retry.';
+      }
+    } finally {
+      if (mounted) setState(() => _loadingSettings = false);
+    }
+  }
+
+  double get _totalPayment => parseMoneyInput(_amountController.text) ?? 0;
+  double get _shareAmount =>
+      (_totalPayment - _configuredJamiiAmount).clamp(0, double.infinity);
+
+  Widget _breakdownRow(
+    String label,
+    double amount, {
+    bool emphasized = false,
+  }) => Padding(
+    padding: EdgeInsets.symmetric(vertical: 6.h),
+    child: Row(
+      children: [
+        Expanded(child: Text(label)),
+        Flexible(
+          child: Text(
+            formatMoney(amount, currency: _controller.currency.value),
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontWeight: emphasized ? FontWeight.w900 : FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
   @override
   void dispose() {
@@ -52,9 +104,14 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
   }
 
   Future<void> _submitPurchase() async {
-    if (!_formKey.currentState!.validate() || _isSubmitting) return;
+    if (_loadingSettings ||
+        _settingsError != null ||
+        !_formKey.currentState!.validate() ||
+        _isSubmitting) {
+      return;
+    }
 
-    final amount = double.parse(_amountController.text.trim());
+    final amount = parseMoneyInput(_amountController.text)!;
     final quantity = _requestedQuantity;
     if (_configuredJamiiAmount <= 0) {
       Get.snackbar(
@@ -76,12 +133,11 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
         paymentReference: _paymentReferenceController.text.trim(),
         proofText: _noteController.text.trim(),
         proofFilePath: _proofFilePath,
-        jamiiAmount: _configuredJamiiAmount,
       );
       if (!mounted) return;
       Get.snackbar(
         'Proof submitted for review',
-        '${quantity.toStringAsFixed(8)} shares await accountant and chair approval.',
+        '${formatMoney(amount, currency: _controller.currency.value)} submitted: ${formatMoney(_shareAmount)} for ${quantity.toStringAsFixed(8)} shares and ${formatMoney(_configuredJamiiAmount)} for Jamii. Awaiting approval.',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: AppColors.primary,
         colorText: Colors.white,
@@ -108,6 +164,12 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
       );
       final file = files.isEmpty ? null : files.first;
+      if (file != null && (await file.length() ?? 0) > 5 * 1024 * 1024) {
+        if (mounted) {
+          Get.snackbar('File too large', 'Attach an image or PDF up to 5 MB.');
+        }
+        return;
+      }
       if (file?.path != null && mounted) {
         setState(() {
           _proofFilePath = file!.path;
@@ -166,7 +228,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                       ),
                       SizedBox(height: 6.h),
                       Text(
-                        'One share: ${_controller.currency.value} ${_sharePrice.toStringAsFixed(0)}',
+                        'One share: ${formatMoney(_sharePrice, currency: _controller.currency.value)}',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 22.sp,
@@ -188,10 +250,13 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 SizedBox(height: 8.h),
                 TextFormField(
                   controller: _amountController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [MoneyInputFormatter()],
                   decoration: InputDecoration(
-                    prefixText: 'TZS ',
-                    hintText: '50000',
+                    prefixText: '${_controller.currency.value} ',
+                    hintText: 'Enter payment amount',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14.r),
                     ),
@@ -201,7 +266,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter an amount';
                     }
-                    final amount = double.tryParse(value.trim());
+                    final amount = parseMoneyInput(value);
                     if (amount == null || amount <= 0) {
                       return 'Enter a valid number';
                     }
@@ -224,28 +289,67 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                   },
                 ),
                 SizedBox(height: 18.h),
-                Text(
-                  'Jamii amount',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 8.h),
-                TextFormField(
-                  initialValue: _configuredJamiiAmount > 0
-                      ? _configuredJamiiAmount.toStringAsFixed(2)
-                      : '',
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    prefixText: '${_controller.currency.value} ',
-                    hintText: 'Ask admin to configure Jamii',
-                    helperText:
-                        'Deducted from the total payment before calculating shares.',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14.r),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(16.r),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
                     ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Payment breakdown',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      SizedBox(height: 8.h),
+                      if (_loadingSettings)
+                        const LinearProgressIndicator()
+                      else if (_settingsError != null) ...[
+                        Text(
+                          _settingsError!,
+                          style: const TextStyle(color: AppColors.error),
+                        ),
+                        TextButton(
+                          onPressed: _loadSettings,
+                          child: const Text('Retry'),
+                        ),
+                      ] else ...[
+                        _breakdownRow('Total payment', _totalPayment),
+                        _breakdownRow('Jamii deducted', _configuredJamiiAmount),
+                        const Divider(),
+                        _breakdownRow(
+                          'Amount for shares',
+                          _shareAmount,
+                          emphasized: true,
+                        ),
+                        SizedBox(height: 6.h),
+                        Text(
+                          '${_requestedQuantity.toStringAsFixed(8)} shares',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 8.h),
+                        Text(
+                          'Minimum for shares: ${formatMoney(_number(_controller.shareSummary['minimumSharePurchaseAmount']), currency: _controller.currency.value)}',
+                        ),
+                        if (_configuredJamiiAmount <= 0 || _sharePrice <= 0)
+                          const Text(
+                            'Ask your group admin to configure the share price and Jamii amount before submitting.',
+                            style: TextStyle(color: AppColors.error),
+                          ),
+                      ],
+                      SizedBox(height: 12.h),
+                      const Text(
+                        'Jamii is deducted from your total payment. Shares and Jamii are recorded separately after approval.',
+                      ),
+                    ],
                   ),
                 ),
                 SizedBox(height: 18.h),
@@ -277,17 +381,6 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                     if (value != null) setState(() => _paymentMethod = value);
                   },
                 ),
-                if (_requestedQuantity > 0) ...[
-                  SizedBox(height: 10.h),
-                  Text(
-                    '${_controller.currency.value} ${_configuredJamiiAmount.toStringAsFixed(2)} Jamii + ${_controller.currency.value} ${((double.tryParse(_amountController.text.trim()) ?? 0) - _configuredJamiiAmount).toStringAsFixed(2)} shares = ${_requestedQuantity.toStringAsFixed(8)} shares',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
                 SizedBox(height: 18.h),
                 Text(
                   'M-Pesa reference or receipt number',
@@ -331,6 +424,9 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                   ),
                 ),
                 SizedBox(height: 12.h),
+                const Text(
+                  'Payment proof required: JPG, PNG or PDF, up to 5 MB.',
+                ),
                 OutlinedButton.icon(
                   onPressed: _isSubmitting ? null : _pickProofFile,
                   icon: const Icon(Icons.attach_file_rounded),
@@ -340,7 +436,14 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _isSubmitting ? null : _submitPurchase,
+                    onPressed:
+                        _isSubmitting ||
+                            _loadingSettings ||
+                            _settingsError != null ||
+                            _configuredJamiiAmount <= 0 ||
+                            _sharePrice <= 0
+                        ? null
+                        : _submitPurchase,
                     icon: _isSubmitting
                         ? SizedBox(
                             width: 18.w,
@@ -377,173 +480,6 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
       : double.tryParse(value?.toString() ?? '') ?? 0;
 }
 
-class MemberContributionPage extends StatefulWidget {
-  const MemberContributionPage({super.key});
-
-  @override
-  State<MemberContributionPage> createState() => _MemberContributionPageState();
-}
-
-class _MemberContributionPageState extends State<MemberContributionPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
-  final _dateController = TextEditingController();
-  String _type = 'Regular contribution';
-
-  @override
-  void initState() {
-    super.initState();
-    _dateController.text = DateTime.now().toLocal().toString().split(' ')[0];
-  }
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _dateController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Add contribution')),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 30.h),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Contribution type',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Wrap(
-                spacing: 8.w,
-                children:
-                    [
-                          'Regular contribution',
-                          'Emergency fund',
-                          'Special contribution',
-                        ]
-                        .map(
-                          (option) => ChoiceChip(
-                            label: Text(option),
-                            selected: _type == option,
-                            onSelected: (_) => setState(() => _type = option),
-                            selectedColor: AppColors.primary.withValues(
-                              alpha: .12,
-                            ),
-                            side: BorderSide(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
-                            ),
-                          ),
-                        )
-                        .toList(),
-              ),
-              SizedBox(height: 18.h),
-              Text(
-                'Amount',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              SizedBox(height: 8.h),
-              TextFormField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  prefixText: 'TZS ',
-                  hintText: '200000',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter contribution amount';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Enter a valid amount';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 18.h),
-              Text(
-                'Date',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              SizedBox(height: 8.h),
-              TextFormField(
-                controller: _dateController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                  ),
-                  suffixIcon: const Icon(Icons.calendar_today_rounded),
-                ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2024),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    _dateController.text = picked.toLocal().toString().split(
-                      ' ',
-                    )[0];
-                  }
-                },
-              ),
-              SizedBox(height: 28.h),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      Get.snackbar(
-                        'Contribution not submitted',
-                        'Contribution submission is not available until an active contribution period is selected.',
-                        snackPosition: SnackPosition.BOTTOM,
-                        backgroundColor: AppColors.error,
-                        colorText: Colors.white,
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.add_circle_rounded),
-                  label: const Text('Save contribution'),
-                  style: FilledButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14.r),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class MemberLoanRequestPage extends StatefulWidget {
   const MemberLoanRequestPage({super.key});
 
@@ -569,11 +505,11 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
       : double.tryParse(value?.toString() ?? '') ?? 0;
   int _integer(Object? value) =>
       value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
-  double get _amount => double.tryParse(_amountController.text.trim()) ?? 0;
+  double get _amount => parseMoneyInput(_amountController.text) ?? 0;
   double get _interest =>
       _amount * _number(_context['interestRate']) * _months / 100;
   String _money(Object? value) =>
-      '${_controller.currency.value} ${_number(value).toStringAsFixed(2)}';
+      formatMoney(value, currency: _controller.currency.value);
 
   Map<String, dynamic>? get _openLoan {
     final memberId = _integer(_context['groupMemberId']);
@@ -946,6 +882,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
           TextFormField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [MoneyInputFormatter()],
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Amount requested',
@@ -953,7 +890,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
               helperText: 'Maximum ${_money(maxLoan)}',
             ),
             validator: (value) {
-              final amount = double.tryParse(value?.trim() ?? '');
+              final amount = parseMoneyInput(value);
               if (amount == null || amount <= 0) return 'Enter a valid amount';
               if (amount > maxLoan) {
                 return 'Amount exceeds your borrowing limit';
@@ -1345,7 +1282,7 @@ class _MemberGuaranteeRequestsPageState
                           ),
                           SizedBox(height: 14.h),
                           Text(
-                            'Guaranteed amount: ${_controller.currency.value} ${request['guaranteedAmount'] ?? 0}',
+                            'Guaranteed amount: ${formatMoney(request['guaranteedAmount'], currency: _controller.currency.value)}',
                             style: TextStyle(
                               fontSize: 14.sp,
                               fontWeight: FontWeight.w800,
@@ -1419,10 +1356,8 @@ class _MemberLoanApplicationsPageState
 
   int _int(Object? value) =>
       value is num ? value.toInt() : int.tryParse('$value') ?? 0;
-  double _number(Object? value) =>
-      value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
   String _money(Object? value) =>
-      '${_controller.currency.value} ${_number(value).toStringAsFixed(2)}';
+      formatMoney(value, currency: _controller.currency.value);
   List<Map<String, dynamic>> _list(Object? value) => value is List
       ? value.whereType<Map>().map(Map<String, dynamic>.from).toList()
       : <Map<String, dynamic>>[];
@@ -1482,39 +1417,21 @@ class _MemberLoanApplicationsPageState
     return result;
   }
 
-  Future<void> _act(Map<String, dynamic> loan, String action) async {
+  Future<void> _cancel(Map<String, dynamic> loan) async {
     if (_actingId != null) return;
-    String? reason;
-    if (action != 'approve' && action != 'disburse') {
-      reason = await _reason(
-        action == 'return'
-            ? 'Return'
-            : action == 'reject'
-            ? 'Reject'
-            : 'Cancel',
-      );
-      if (reason == null) return;
-    }
-    final id = _int(loan['id']);
-    setState(() => _actingId = id);
+    final reason = await _reason('Cancel');
+    if (reason == null || !mounted) return;
+    setState(() => _actingId = _int(loan['id']));
     try {
-      final result = await _controller.reviewLoan(id, action, reason: reason);
-      if (!mounted) return;
-      final active = result['status'] == 'ACTIVE';
-      Get.snackbar(
-        active ? 'Loan disbursed' : 'Decision saved',
-        active
-            ? 'The accountant approval completed the workflow. The loan and repayment schedule are now active.'
-            : action == 'approve'
-            ? 'Approved and moved to the next configured reviewer.'
-            : action == 'return'
-            ? 'Returned to the previous reviewer.'
-            : 'The application was ${action}ed.',
-        backgroundColor: AppColors.primary,
-        colorText: Colors.white,
-      );
+      await _controller.cancelLoan(_int(loan['id']), reason: reason);
+      if (mounted) {
+        Get.snackbar(
+          'Application cancelled',
+          'Your loan application has been cancelled.',
+        );
+      }
     } catch (error) {
-      if (mounted) _error('Decision failed', error);
+      if (mounted) _error('Cancellation failed', error);
     } finally {
       if (mounted) setState(() => _actingId = null);
     }
@@ -1523,7 +1440,10 @@ class _MemberLoanApplicationsPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Loan applications'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('My loan applications'),
+        centerTitle: true,
+      ),
       body: Obx(() {
         final all = _controller.loanApplications.toList();
         final queue = all
@@ -1553,12 +1473,11 @@ class _MemberLoanApplicationsPageState
               _workflowHeader(queue),
               SizedBox(height: 16.h),
               Text(
-                'Approval queue',
+                'My pending applications',
                 style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900),
               ),
               SizedBox(height: 10.h),
-              if (queue.isEmpty)
-                _empty('No applications are waiting for review.'),
+              if (queue.isEmpty) _empty('You have no pending applications.'),
               ...queue.map(_applicationCard),
               if (history.isNotEmpty) ...[
                 SizedBox(height: 20.h),
@@ -1593,7 +1512,7 @@ class _MemberLoanApplicationsPageState
         const Icon(Icons.account_tree_rounded, color: Colors.white),
         SizedBox(height: 12.h),
         Text(
-          'Chair → Accountant → Disbursement',
+          'My loan progress',
           style: TextStyle(
             color: Colors.white,
             fontSize: 17.sp,
@@ -1602,7 +1521,7 @@ class _MemberLoanApplicationsPageState
         ),
         SizedBox(height: 5.h),
         Text(
-          'The saved group workflow starts after every guarantor accepts. The final accountant approval activates the loan and creates its repayment schedule.',
+          'Track your guarantors, application status and repayment schedule here.',
           style: TextStyle(
             color: Colors.white.withValues(alpha: .78),
             fontSize: 11.sp,
@@ -1621,8 +1540,8 @@ class _MemberLoanApplicationsPageState
               'In review',
             ),
             _headerCount(
-              '${queue.where((loan) => loan['canApprove'] == true).length}',
-              'Your action',
+              '${queue.where((loan) => loan['status'] == 'APPROVED').length}',
+              'Approved',
             ),
           ],
         ),
@@ -1774,44 +1693,6 @@ class _MemberLoanApplicationsPageState
             SizedBox(height: 12.h),
             if (status == 'PENDING')
               const Text('Waiting for every guarantor to accept.')
-            else if (loan['canApprove'] == true)
-              Wrap(
-                spacing: 8.w,
-                runSpacing: 8.h,
-                children: [
-                  FilledButton.icon(
-                    onPressed: loading ? null : () => _act(loan, 'approve'),
-                    icon: loading
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.check_rounded),
-                    label: Text(
-                      current?['role'] == 'ACCOUNTANT'
-                          ? 'Approve & disburse'
-                          : 'Approve step',
-                    ),
-                  ),
-                  if (steps.any(
-                    (step) =>
-                        _int(step['stepOrder']) < _int(current?['stepOrder']) &&
-                        step['approvedByMemberId'] != null,
-                  ))
-                    OutlinedButton.icon(
-                      onPressed: loading ? null : () => _act(loan, 'return'),
-                      icon: const Icon(Icons.undo_rounded),
-                      label: const Text('Return'),
-                    ),
-                  OutlinedButton(
-                    onPressed: loading ? null : () => _act(loan, 'reject'),
-                    child: const Text('Reject'),
-                  ),
-                ],
-              )
             else
               Text(
                 'Waiting for ${current?['label'] ?? 'the configured reviewer'}.',
@@ -1822,7 +1703,7 @@ class _MemberLoanApplicationsPageState
             if (loan['canCancel'] == true) ...[
               SizedBox(height: 8.h),
               TextButton.icon(
-                onPressed: loading ? null : () => _act(loan, 'cancel'),
+                onPressed: loading ? null : () => _cancel(loan),
                 icon: const Icon(Icons.cancel_outlined),
                 label: const Text('Cancel application'),
               ),
@@ -1954,7 +1835,7 @@ class _MemberLoanDetailsPageState extends State<MemberLoanDetailsPage> {
   double _number(Object? value) =>
       value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
   String _money(Object? value) =>
-      '${_controller.currency.value} ${_number(value).toStringAsFixed(2)}';
+      formatMoney(value, currency: _controller.currency.value);
 
   @override
   void initState() {
@@ -2128,7 +2009,7 @@ class MemberFinesPage extends StatelessWidget {
       : double.tryParse(value?.toString() ?? '') ?? 0;
 
   String _money(Object? value, String currency) =>
-      '$currency ${_amount(value).toStringAsFixed(2)}';
+      formatMoney(value, currency: currency);
 
   @override
   Widget build(BuildContext context) {
