@@ -28,35 +28,114 @@ class _MemberPageState extends State<MemberPage> {
       builder: (controller) {
         return Scaffold(
           appBar: AppBar(
+            toolbarHeight: 50.h,
+            centerTitle: false,
+            titleSpacing: 16.w,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            surfaceTintColor: Colors.transparent,
+            scrolledUnderElevation: 0,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(height: 1, color: AppColors.softBorder),
+            ),
             title: Obx(
-              () => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    controller.groupName.value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  Text(
-                    'Your role · ${controller.currentGroupRole.value.replaceAll('_', ' ')}',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 10.sp,
-                      fontWeight: FontWeight.w600,
+              () => Tooltip(
+                message: 'Switch group',
+                child: InkWell(
+                  onTap: () => Get.toNamed('/select-group'),
+                  borderRadius: BorderRadius.circular(15.r),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 5.h),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42.w,
+                          height: 42.w,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(14.r),
+                          ),
+                          child: Icon(
+                            Icons.groups_rounded,
+                            color: Colors.white,
+                            size: 22.sp,
+                          ),
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                controller.groupName.value,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              SizedBox(height: 4.h),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.badge_outlined,
+                                    size: 12.sp,
+                                    color: AppColors.secondary,
+                                  ),
+                                  SizedBox(width: 4.w),
+                                  Flexible(
+                                    child: Text(
+                                      controller.currentGroupRole.value
+                                          .replaceAll('_', ' '),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                        fontSize: 9.sp,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 3.w),
+                        Icon(
+                          Icons.expand_more_rounded,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 19.sp,
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
             actions: [
-              IconButton(
-                tooltip: 'Switch group',
-                onPressed: () => Get.toNamed('/select-group'),
-                icon: const Icon(Icons.swap_horiz_rounded),
-              ),
-              SizedBox(width: 6.w),
+              Obx(() {
+                final pending = controller.guaranteeRequests
+                    .where(
+                      (request) =>
+                          request['status']?.toString().toUpperCase() ==
+                          'PENDING',
+                    )
+                    .length;
+                return _NotificationBell(
+                  count: pending,
+                  onTap: () =>
+                      Get.to(() => const MemberGuaranteeRequestsPage()),
+                );
+              }),
+              SizedBox(width: 12.w),
             ],
           ),
           body: SafeArea(
@@ -118,29 +197,12 @@ class _HomeView extends StatelessWidget {
         DateTime.now().hour,
         controller.memberName.value,
       );
-      final guaranteeCount = controller.guaranteeRequests
-          .where(
-            (request) =>
-                request['status']?.toString().toUpperCase() == 'PENDING',
-          )
-          .length;
       return VikobaRefreshIndicator(
         onRefresh: controller.loadDashboard,
         child: ListView(
           padding: EdgeInsets.fromLTRB(20.w, 18.h, 20.w, 28.h),
           children: [
-            Row(
-              children: [
-                const Spacer(),
-                _RoundButton(
-                  icon: Icons.notifications_none_rounded,
-                  badge: guaranteeCount,
-                  onTap: () =>
-                      Get.to(() => const MemberGuaranteeRequestsPage()),
-                ),
-              ],
-            ),
-            SizedBox(height: 22.h),
+            SizedBox(height: 8.h),
             Text(
               greeting,
               style: TextStyle(
@@ -849,54 +911,80 @@ class _SectionTitle extends StatelessWidget {
   );
 }
 
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.onTap, this.badge = 0});
-  final IconData icon;
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell({required this.count, required this.onTap});
+
+  final int count;
   final VoidCallback onTap;
-  final int badge;
+
   @override
-  Widget build(BuildContext context) => Stack(
-    clipBehavior: Clip.none,
-    children: [
-      InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(15.r),
-        child: Container(
-          width: 42.w,
-          height: 42.w,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(15.r),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: count > 0
+        ? '$count pending guarantee requests'
+        : 'No pending guarantee requests',
+    child: Tooltip(
+      message: count > 0
+          ? '$count pending guarantee requests'
+          : 'No pending guarantee requests',
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15.r),
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(15.r),
+          child: SizedBox(
+            width: 46.w,
+            height: 46.w,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  count > 0
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_none_rounded,
+                  color: AppColors.primary,
+                  size: 22.sp,
+                ),
+                if (count > 0)
+                  Positioned(
+                    right: 4.w,
+                    top: 3.h,
+                    child: Container(
+                      constraints: BoxConstraints(
+                        minWidth: 17.w,
+                        minHeight: 17.w,
+                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.surface,
+                          width: 1.5,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        count > 9 ? '9+' : '$count',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 8.sp,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-          child: Icon(icon, color: AppColors.primary, size: 21.sp),
         ),
       ),
-      if (badge > 0)
-        Positioned(
-          right: -4.w,
-          top: -5.h,
-          child: Container(
-            constraints: BoxConstraints(minWidth: 18.w, minHeight: 18.w),
-            padding: EdgeInsets.symmetric(horizontal: 4.w),
-            decoration: const BoxDecoration(
-              color: AppColors.error,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              badge > 9 ? '9+' : '$badge',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 9.sp,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ),
-    ],
+    ),
   );
 }
 
