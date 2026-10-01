@@ -6,6 +6,7 @@ import 'package:vikoba_app/features/auth/presentation/auth_binding.dart';
 import 'package:vikoba_app/features/auth/presentation/auth_page.dart';
 import 'package:vikoba_app/features/member/presentation/member_binding.dart';
 import 'package:vikoba_app/features/member/presentation/member_page.dart';
+import 'package:vikoba_app/features/member/presentation/group_selection_page.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -27,5 +28,6 @@ class AppRoutes {
       page: () => const MemberPage(),
       binding: MemberBinding(),
     ),
+    GetPage(name: '/select-group', page: () => const GroupSelectionPage()),
   ];
 }

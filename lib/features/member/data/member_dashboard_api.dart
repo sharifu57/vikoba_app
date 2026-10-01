@@ -92,6 +92,27 @@ class MemberDashboardApi {
         'meetings',
       );
 
+  Future<Map<String, dynamic>> getMeetingComments(int meetingId) async =>
+      _mapResponse(
+        await _dio.get(
+          '${AppConfig.meeting(meetingId)}/comments',
+          options: _freshReadOptions,
+        ),
+        'meeting comments',
+      );
+
+  Future<Map<String, dynamic>> addMeetingComment(
+    int meetingId,
+    String content,
+  ) async => _mapResponse(
+    await _dio.post(
+      '${AppConfig.meeting(meetingId)}/comments',
+      data: {'content': content},
+      options: Options(extra: {'requiresAuth': true}),
+    ),
+    'meeting comment',
+  );
+
   Future<Map<String, dynamic>> getMeeting(int meetingId) async => _mapResponse(
     await _dio.get(
       AppConfig.meeting(meetingId),
@@ -207,7 +228,7 @@ class MemberDashboardApi {
   ) async => _listResponse(
     await _dio.get(
       AppConfig.loanSchedule(groupId, loanId),
-      options: Options(extra: {'requiresAuth': true}),
+      options: _freshReadOptions,
     ),
     'loan repayment schedule',
   );

@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'otp_input.dart';
 import 'package:get/get.dart';
 
 import 'package:vikoba_app/config/app_client.dart';
@@ -19,6 +22,67 @@ class AuthController extends GetxController {
   final secondsRemaining = 0.obs;
   final otpSent = false.obs;
   Timer? _countdown;
+  static const _smsChannel = MethodChannel('vikoba/otp_sms');
+  bool _acceptSms = false;
+  final codeHint = RxnString();
+
+  Future<void> _listenForCode() async {
+    _acceptSms = true;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    _smsChannel.setMethodCallHandler((call) async {
+      if (call.method != 'sms' || !_acceptSms || isClosed) return;
+      final message = call.arguments?.toString() ?? '';
+      if (!message.toUpperCase().contains('VIKOBA360')) return;
+      final code = extractOtp(message);
+      if (code != null) {
+        _fillCode(code, 'Code filled from SMS. Tap Verify and continue.');
+      }
+    });
+    try {
+      await _smsChannel
+          .invokeMethod<bool>('start')
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // Keyboard autofill, paste and manual entry remain available.
+    }
+  }
+
+  Future<void> _stopListening() async {
+    _acceptSms = false;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    _smsChannel.setMethodCallHandler(null);
+    try {
+      await _smsChannel.invokeMethod<void>('stop');
+    } catch (_) {}
+  }
+
+  void _fillCode(String code, String message) {
+    otpController.value = TextEditingValue(
+      text: code,
+      selection: const TextSelection.collapsed(offset: 6),
+    );
+    errorMessage.value = null;
+    codeHint.value = message;
+  }
+
+  Future<void> pasteCode() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (isClosed || !otpSent.value) return;
+      final code = extractOtp(data?.text ?? '');
+      if (code == null) {
+        errorMessage.value =
+            'Copy the 6-digit code or its SMS, then tap Paste code.';
+        return;
+      }
+      _fillCode(code, 'Code pasted. Tap Verify and continue.');
+    } catch (_) {
+      if (!isClosed) {
+        errorMessage.value =
+            'Unable to paste. Touch and hold the code field to paste, or type the code.';
+      }
+    }
+  }
 
   @override
   void onInit() {
@@ -27,6 +91,7 @@ class AuthController extends GetxController {
   }
 
   Future<void> requestOtp() async {
+    if (isLoading.value || isResending.value) return;
     final normalized = _normalizePhone(phoneController.text);
     if (normalized == null) {
       errorMessage.value = 'Enter 9 digits after the 255 prefix.';
@@ -34,6 +99,9 @@ class AuthController extends GetxController {
     }
 
     await _run(() async {
+      otpController.clear();
+      codeHint.value = null;
+      await _listenForCode();
       final response = await _api.requestOtp(normalized);
       if (response['status'] != true) {
         throw Exception(
@@ -44,11 +112,12 @@ class AuthController extends GetxController {
       otpSent.value = true;
       _startCountdown();
     });
+    if (!otpSent.value) await _stopListening();
   }
 
   Future<void> verifyOtp() async {
     final code = otpController.text.trim();
-    if (code.length != 6 || int.tryParse(code) == null) {
+    if (!RegExp(r'^[0-9]{6}$').hasMatch(code)) {
       errorMessage.value = 'Enter the 6-digit code sent to your phone.';
       return;
     }
@@ -59,18 +128,26 @@ class AuthController extends GetxController {
       if (!success) {
         throw Exception(response['message'] ?? 'Unable to verify OTP.');
       }
+      await _stopListening();
+      TextInput.finishAutofillContext(shouldSave: false);
       await TokenStorage.saveSession(response);
       await TokenStorage.navigateAfterLogin();
     });
   }
 
   Future<void> resendOtp() async {
-    if (secondsRemaining.value > 0 || phone.value.isEmpty) {
+    if (secondsRemaining.value > 0 ||
+        phone.value.isEmpty ||
+        isResending.value ||
+        isLoading.value) {
       return;
     }
     isResending.value = true;
     errorMessage.value = null;
     try {
+      otpController.clear();
+      codeHint.value = null;
+      await _listenForCode();
       final response = await _api.resendOtp(phone.value);
       if (response['status'] != true) {
         throw Exception(response['message'] ?? 'Unable to resend OTP.');
@@ -84,6 +161,9 @@ class AuthController extends GetxController {
   }
 
   void changeNumber() {
+    if (isLoading.value || isResending.value) return;
+    unawaited(_stopListening());
+    codeHint.value = null;
     otpSent.value = false;
     otpController.clear();
     errorMessage.value = null;
@@ -100,6 +180,7 @@ class AuthController extends GetxController {
   }
 
   Future<void> _run(Future<void> Function() action) async {
+    if (isLoading.value || isResending.value) return;
     isLoading.value = true;
     errorMessage.value = null;
     try {
@@ -137,6 +218,7 @@ class AuthController extends GetxController {
 
   @override
   void onClose() {
+    unawaited(_stopListening());
     _countdown?.cancel();
     phoneController.dispose();
     otpController.dispose();

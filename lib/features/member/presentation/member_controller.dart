@@ -213,6 +213,22 @@ class MemberController extends GetxController {
     }
   }
 
+  Future<Map<String, dynamic>> loadMeetingComments(int meetingId) async {
+    try {
+      return await _api.getMeetingComments(meetingId);
+    } catch (error) {
+      throw Exception(_message(error, operation: 'load meeting comments'));
+    }
+  }
+
+  Future<void> addMeetingComment(int meetingId, String content) async {
+    try {
+      await _api.addMeetingComment(meetingId, content);
+    } catch (error) {
+      throw Exception(_message(error, operation: 'save your comment'));
+    }
+  }
+
   Future<void> applyForLoan({
     required double amount,
     required int durationMonths,

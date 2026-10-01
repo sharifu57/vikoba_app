@@ -1,3 +1,4 @@
+import 'package:vikoba_app/app/widgets/vikoba_loader.dart';
 import 'package:vikoba_app/core/formatters/money_formatter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +27,38 @@ class _MemberPageState extends State<MemberPage> {
     return GetBuilder<MemberController>(
       builder: (controller) {
         return Scaffold(
+          appBar: AppBar(
+            title: Obx(
+              () => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    controller.groupName.value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  Text(
+                    'Your role · ${controller.currentGroupRole.value.replaceAll('_', ' ')}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              IconButton(
+                tooltip: 'Switch group',
+                onPressed: () => Get.toNamed('/select-group'),
+                icon: const Icon(Icons.swap_horiz_rounded),
+              ),
+              SizedBox(width: 6.w),
+            ],
+          ),
           body: SafeArea(
             child: IndexedStack(
               index: selectedIndex,
@@ -91,15 +124,13 @@ class _HomeView extends StatelessWidget {
                 request['status']?.toString().toUpperCase() == 'PENDING',
           )
           .length;
-      return RefreshIndicator(
-        color: AppColors.primary,
+      return VikobaRefreshIndicator(
         onRefresh: controller.loadDashboard,
         child: ListView(
           padding: EdgeInsets.fromLTRB(20.w, 18.h, 20.w, 28.h),
           children: [
             Row(
               children: [
-                const VikobaLogo(size: 42, showName: true, nameSize: 18),
                 const Spacer(),
                 _RoundButton(
                   icon: Icons.notifications_none_rounded,
@@ -530,7 +561,6 @@ class _ShareHistoryChart extends StatelessWidget {
                                   color: spot.y > 0
                                       ? AppColors.secondary
                                       : colorScheme.outlineVariant,
-                                  strokeWidth: 2,
                                   strokeColor: colorScheme.surface,
                                 ),
                           ),
@@ -1269,7 +1299,7 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
   @override
   Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      const Center(child: VikobaLoader(color: AppColors.primary));
 }
 
 class _ErrorView extends StatelessWidget {

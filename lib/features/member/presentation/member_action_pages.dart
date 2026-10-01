@@ -1,3 +1,4 @@
+import 'package:vikoba_app/app/widgets/vikoba_loader.dart';
 import 'package:vikoba_app/core/formatters/money_input_formatter.dart';
 import 'package:vikoba_app/core/formatters/money_formatter.dart';
 import 'package:flutter/material.dart';
@@ -308,7 +309,12 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                       ),
                       SizedBox(height: 8.h),
                       if (_loadingSettings)
-                        const LinearProgressIndicator()
+                        const Center(
+                          child: VikobaLoader(
+                            size: 32,
+                            label: 'Loading share settings',
+                          ),
+                        )
                       else if (_settingsError != null) ...[
                         Text(
                           _settingsError!,
@@ -448,10 +454,7 @@ class _MemberSharePurchasePageState extends State<MemberSharePurchasePage> {
                         ? SizedBox(
                             width: 18.w,
                             height: 18.w,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                            child: const VikobaLoader(color: Colors.white),
                           )
                         : const Icon(Icons.check_circle_rounded),
                     label: Text(
@@ -635,7 +638,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
       appBar: AppBar(title: const Text('Apply for a loan'), centerTitle: true),
       body: Obx(() {
         if (_context.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: VikobaLoader());
         }
         final existing = _openLoan;
         if (existing != null) return _existingApplication(existing);
@@ -658,7 +661,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
               .where((item) => item['available'] == true)
               .toList()
         : <Map<String, dynamic>>[];
-    return RefreshIndicator(
+    return VikobaRefreshIndicator(
       onRefresh: _controller.loadLoanData,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -745,9 +748,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
                         icon: _submitting
                             ? const SizedBox.square(
                                 dimension: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                                child: VikobaLoader(),
                               )
                             : const Icon(Icons.person_add_alt_1_rounded),
                         label: const Text('Invite replacement'),
@@ -1036,10 +1037,7 @@ class _MemberLoanRequestPageState extends State<MemberLoanRequestPage> {
             icon: _submitting
                 ? const SizedBox.square(
                     dimension: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
+                    child: VikobaLoader(color: Colors.white),
                   )
                 : const Icon(Icons.send_rounded),
             label: Text(
@@ -1194,7 +1192,7 @@ class _MemberGuaranteeRequestsPageState
         final requests = _controller.guaranteeRequests
             .where((item) => item['status'] == 'PENDING')
             .toList();
-        return RefreshIndicator(
+        return VikobaRefreshIndicator(
           onRefresh: _controller.loadLoanData,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -1318,8 +1316,7 @@ class _MemberGuaranteeRequestsPageState
                                   child: _actingId == id
                                       ? const SizedBox.square(
                                           dimension: 17,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
+                                          child: VikobaLoader(
                                             color: Colors.white,
                                           ),
                                         )
@@ -1464,7 +1461,7 @@ class _MemberLoanApplicationsPageState
               }.contains(loan['status']),
             )
             .toList();
-        return RefreshIndicator(
+        return VikobaRefreshIndicator(
           onRefresh: _controller.loadLoanData,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -1831,6 +1828,7 @@ class MemberLoanDetailsPage extends StatefulWidget {
 class _MemberLoanDetailsPageState extends State<MemberLoanDetailsPage> {
   final MemberController _controller = Get.find<MemberController>();
   bool _loading = true;
+  String? _loadError;
   List<Map<String, dynamic>> _schedule = <Map<String, dynamic>>[];
   double _number(Object? value) =>
       value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
@@ -1844,12 +1842,17 @@ class _MemberLoanDetailsPageState extends State<MemberLoanDetailsPage> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       _schedule = await _controller.loadLoanSchedule(
         (widget.loan['id'] as num).toInt(),
       );
     } catch (error) {
       if (mounted) {
+        _loadError = error.toString().replaceFirst('Exception: ', '');
         Get.snackbar(
           'Schedule unavailable',
           error.toString().replaceFirst('Exception: ', ''),
@@ -1889,8 +1892,28 @@ class _MemberLoanDetailsPageState extends State<MemberLoanDetailsPage> {
                   SizedBox(height: 12.h),
                   _row('Principal', _money(loan['principalAmount'])),
                   _row('Interest', _money(loan['interestAmount'])),
-                  _row('Total due', _money(loan['totalAmount'])),
-                  _row('Outstanding', _money(loan['remainingBalance'])),
+                  _row(
+                    'Total due',
+                    _money(
+                      _schedule.isEmpty
+                          ? loan['totalAmount']
+                          : _schedule.fold<double>(
+                              0,
+                              (sum, row) => sum + _number(row['totalAmount']),
+                            ),
+                    ),
+                  ),
+                  _row(
+                    'Outstanding',
+                    _money(
+                      _schedule.isEmpty
+                          ? loan['remainingBalance']
+                          : _schedule.fold<double>(
+                              0,
+                              (sum, row) => sum + _number(row['balance']),
+                            ),
+                    ),
+                  ),
                   _row('Disbursed', '${loan['disbursementDate'] ?? 'Waiting'}'),
                   _row('Maturity', '${loan['maturityDate'] ?? 'Waiting'}'),
                 ],
@@ -1908,13 +1931,31 @@ class _MemberLoanDetailsPageState extends State<MemberLoanDetailsPage> {
             ],
           ),
           SizedBox(height: 15.h),
+          if (appliedFines > 0)
+            Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: Text(
+                'Late fines of ${_money(appliedFines)} have been recorded in this schedule. Unpaid fines are included in the outstanding balance.',
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
           Text(
             'Repayment schedule',
             style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900),
           ),
           SizedBox(height: 9.h),
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const Center(child: VikobaLoader())
+          else if (_loadError != null)
+            Column(
+              children: [
+                Text(
+                  _loadError!,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+                TextButton(onPressed: _load, child: const Text('Retry')),
+              ],
+            )
           else if (_schedule.isEmpty)
             const Text(
               'The schedule is created after accountant approval and disbursement.',
@@ -1942,15 +1983,31 @@ class _MemberLoanDetailsPageState extends State<MemberLoanDetailsPage> {
                           DataCell(Text(_money(row['interestAmount']))),
                           DataCell(
                             Text(
-                              _money(
-                                _number(row['penaltyAmount']) > 0
-                                    ? row['penaltyAmount']
-                                    : lateFine,
+                              _money(row['penaltyAmount']),
+                              style: TextStyle(
+                                color:
+                                    _number(row['penaltyAmount']) > 0 &&
+                                        _number(row['balance']) > 0
+                                    ? AppColors.error
+                                    : null,
+                                fontWeight: _number(row['penaltyAmount']) > 0
+                                    ? FontWeight.w800
+                                    : FontWeight.normal,
                               ),
                             ),
                           ),
                           DataCell(Text(_money(row['balance']))),
-                          DataCell(Text('${row['status']}')),
+                          DataCell(
+                            Text(
+                              '${row['status']}',
+                              style: TextStyle(
+                                color: row['status'] == 'OVERDUE'
+                                    ? AppColors.error
+                                    : null,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     )
@@ -2022,8 +2079,7 @@ class MemberFinesPage extends StatelessWidget {
           0,
           (total, fine) => total + _amount(fine['balance']),
         );
-        return RefreshIndicator(
-          color: AppColors.primary,
+        return VikobaRefreshIndicator(
           onRefresh: controller.loadDashboard,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -2242,9 +2298,9 @@ class _MemberMeetingsPageState extends State<MemberMeetingsPage> {
       body: Obx(() {
         final meetings = _controller.groupMeetings;
         if (_loading && meetings.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: VikobaLoader());
         }
-        return RefreshIndicator(
+        return VikobaRefreshIndicator(
           onRefresh: _load,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -2407,12 +2463,162 @@ class _MemberMeetingDetailPageState extends State<MemberMeetingDetailPage> {
   late Map<String, dynamic> _meeting;
   Map<String, dynamic> _attendance = <String, dynamic>{};
   bool _loading = true;
+  bool _commentsLoading = true;
+  bool _savingComment = false;
+  String? _commentsError;
+  Map<String, dynamic> _commentsContext = {};
+  final _commentInput = TextEditingController();
+
+  int? get _meetingId => int.tryParse('${_meeting['id']}');
+
+  @override
+  void dispose() {
+    _commentInput.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadComments() async {
+    final id = _meetingId;
+    if (id == null) return;
+    setState(() {
+      _commentsLoading = true;
+      _commentsError = null;
+    });
+    try {
+      final result = await _controller.loadMeetingComments(id);
+      if (mounted) setState(() => _commentsContext = result);
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () =>
+              _commentsError = error.toString().replaceFirst('Exception: ', ''),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _commentsLoading = false);
+    }
+  }
+
+  Future<void> _submitComment() async {
+    final text = _commentInput.text.trim();
+    final id = _meetingId;
+    if (_savingComment || id == null || text.isEmpty) return;
+    setState(() => _savingComment = true);
+    try {
+      await _controller.addMeetingComment(id, text);
+      if (!mounted) return;
+      _commentInput.clear();
+      Get.snackbar(
+        'Comment saved',
+        'Your contribution is now part of the meeting record.',
+      );
+      await _loadComments();
+    } catch (error) {
+      if (mounted) {
+        Get.snackbar(
+          'Comment not saved',
+          error.toString().replaceFirst('Exception: ', ''),
+        );
+        await _loadComments();
+      }
+    } finally {
+      if (mounted) setState(() => _savingComment = false);
+    }
+  }
+
+  Widget _commentsSection() {
+    final rows = (_commentsContext['comments'] as List? ?? []).whereType<Map>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Comments & suggestions',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Refresh comments and eligibility',
+              onPressed: _commentsLoading || _savingComment
+                  ? null
+                  : _loadComments,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
+        if (_commentsLoading)
+          const Center(child: VikobaLoader(size: 28))
+        else if (_commentsError != null)
+          Text(_commentsError!, style: const TextStyle(color: AppColors.error))
+        else ...[
+          if (_commentsContext['canComment'] == true) ...[
+            TextField(
+              controller: _commentInput,
+              minLines: 3,
+              maxLines: 5,
+              maxLength: 2000,
+              enabled: !_savingComment,
+              decoration: const InputDecoration(
+                labelText: 'Your comment or suggestion',
+                hintText: 'Share an idea or feedback about this meeting',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _savingComment ? null : _submitComment,
+                icon: _savingComment
+                    ? const VikobaLoader(size: 18, color: Colors.white)
+                    : const Icon(Icons.send_rounded, size: 18),
+                label: Text(_savingComment ? 'Saving...' : 'Post comment'),
+              ),
+            ),
+            const Text(
+              'Available today because you are marked PRESENT. Comments are visible to your group.',
+            ),
+          ] else
+            Text(
+              _commentsContext['reason']?.toString() ??
+                  'Comments are unavailable.',
+            ),
+          const SizedBox(height: 12),
+          if (rows.isEmpty) const Text('No comments yet.'),
+          ...rows.map(
+            (row) => Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${row['memberName'] ?? 'Member'}',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      '${row['createdAt'] ?? ''}'.replaceFirst('T', ' '),
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText('${row['content'] ?? ''}'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     _meeting = Map<String, dynamic>.from(widget.meeting);
     _load();
+    _loadComments();
   }
 
   Future<void> _load() async {
@@ -2461,7 +2667,7 @@ class _MemberMeetingDetailPageState extends State<MemberMeetingDetailPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Meeting details')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: VikobaLoader())
           : ListView(
               padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
               children: [
@@ -2570,6 +2776,8 @@ class _MemberMeetingDetailPageState extends State<MemberMeetingDetailPage> {
                         fontSize: 13.sp,
                       ),
                     ),
+                    SizedBox(height: 24.h),
+                    _commentsSection(),
                     SizedBox(height: 28.h),
                     SizedBox(
                       width: double.infinity,

@@ -1,3 +1,4 @@
+import 'package:vikoba_app/app/widgets/vikoba_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -71,22 +72,12 @@ class SplashPage extends GetView<SplashController> {
                       ),
                     ),
                     SizedBox(height: 52.h),
-                    SizedBox(
-                      width: 132.w,
-                      child: Obx(
-                        () => ClipRRect(
-                          borderRadius: BorderRadius.circular(20.r),
-                          child: LinearProgressIndicator(
-                            minHeight: 4.h,
-                            value: controller.progress.value,
-                            backgroundColor: Colors.white.withValues(
-                              alpha: .16,
-                            ),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.secondary,
-                            ),
-                          ),
-                        ),
+                    Obx(
+                      () => VikobaLoader(
+                        size: 48,
+                        onDark: true,
+                        label: 'Preparing your financial circle',
+                        value: controller.progress.value,
                       ),
                     ),
                     SizedBox(height: 13.h),

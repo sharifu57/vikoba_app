@@ -124,42 +124,7 @@ class TokenStorage {
         (item) => item['settingsConfigured'] == true,
         orElse: () => groups.first,
       );
-      final group = _asMap(primary['group']);
-      final settings = _asMap(primary['settings']);
-      await prefs.setString(_currentGroup, jsonEncode(group));
-      await prefs.setString('current_group_settings', jsonEncode(settings));
-      await prefs.setString(
-        'current_group_role',
-        (primary['role'] ?? 'MEMBER').toString(),
-      );
-      final groupPermissions = primary['permissions'];
-      await prefs.setStringList(
-        'current_group_permissions',
-        groupPermissions is List
-            ? groupPermissions
-                  .map((permission) => permission.toString())
-                  .toList()
-            : <String>[],
-      );
-      await prefs.setInt(
-        'current_group_id',
-        (group['groupId'] as num?)?.toInt() ?? 0,
-      );
-      final groupMemberId = (primary['id'] ??
-              primary['groupMemberId'] ??
-              primary['membershipId'] as num?)
-          ?.toInt();
-      if (groupMemberId != null && groupMemberId > 0) {
-        await prefs.setInt('current_group_member_id', groupMemberId);
-      }
-      await prefs.setString(
-        'current_group_name',
-        group['groupName'] ?? 'Vikoba group',
-      );
-      await prefs.setString(
-        'current_group_currency',
-        group['currency'] ?? 'TZS',
-      );
+      await selectGroup(primary);
     }
 
     // Save organization details
@@ -340,7 +305,8 @@ class TokenStorage {
   }
 
   static Future<void> navigateAfterLogin() async {
-    Get.offAllNamed('/member');
+    final groups = await getGroups();
+    Get.offAllNamed(groups.length > 1 ? '/select-group' : '/member');
   }
 
   static Future<List<String>> getPermissions() async {
@@ -386,6 +352,52 @@ class TokenStorage {
       }
     } catch (_) {}
     return [];
+  }
+
+  static Future<void> selectGroup(Map<String, dynamic> membership) async {
+    final prefs = await SharedPreferences.getInstance();
+    final group = _asMap(membership['group'] ?? membership);
+    final rawGroupId = group['groupId'] ?? group['id'];
+    final groupId = rawGroupId is num
+        ? rawGroupId.toInt()
+        : int.tryParse(rawGroupId?.toString() ?? '');
+    if (groupId == null || groupId <= 0) {
+      throw const FormatException('This group has an invalid identifier.');
+    }
+
+    final settings = _asMap(membership['settings']);
+    final rawRoles = membership['roles'];
+    final roles = rawRoles is List
+        ? rawRoles.map((role) => role.toString()).toList()
+        : <String>[(membership['role'] ?? 'MEMBER').toString()];
+    final rawPermissions = membership['permissions'];
+    final permissions = rawPermissions is List
+        ? rawPermissions.map((permission) => permission.toString()).toList()
+        : <String>[];
+    final rawMemberId = membership['groupMemberId'] ?? membership['id'];
+    final memberId = rawMemberId is num
+        ? rawMemberId.toInt()
+        : int.tryParse(rawMemberId?.toString() ?? '');
+    final groupName = (group['groupName'] ?? group['name'] ?? 'Vikoba group')
+        .toString();
+    final currency = (group['currency'] ?? 'TZS').toString();
+
+    await prefs.setString(_currentGroup, jsonEncode(group));
+    await prefs.setString('current_group_settings', jsonEncode(settings));
+    await prefs.setString(
+      'current_group_role',
+      (membership['role'] ?? roles.firstOrNull ?? 'MEMBER').toString(),
+    );
+    await prefs.setStringList('current_group_roles', roles);
+    await prefs.setStringList('current_group_permissions', permissions);
+    await prefs.setInt('current_group_id', groupId);
+    if (memberId != null && memberId > 0) {
+      await prefs.setInt('current_group_member_id', memberId);
+    } else {
+      await prefs.remove('current_group_member_id');
+    }
+    await prefs.setString('current_group_name', groupName);
+    await prefs.setString('current_group_currency', currency);
   }
 
   static Future<String> getCurrentGroupName() async {

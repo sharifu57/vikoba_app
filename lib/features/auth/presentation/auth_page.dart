@@ -1,3 +1,4 @@
+import 'package:vikoba_app/app/widgets/vikoba_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:vikoba_app/app/constants/app_colors.dart';
 import 'package:vikoba_app/app/widgets/vikoba_logo.dart';
 import 'auth_controller.dart';
+import 'otp_input.dart';
 
 class AuthPage extends GetView<AuthController> {
   const AuthPage({super.key});
@@ -150,6 +152,11 @@ class _OtpStep extends GetView<AuthController> {
         SizedBox(height: 8.h),
         TextField(
           controller: controller.otpController,
+          autofillHints: const [AutofillHints.oneTimeCode],
+          inputFormatters: [OtpInputFormatter()],
+          textInputAction: TextInputAction.done,
+          enableSuggestions: false,
+          autocorrect: false,
           keyboardType: TextInputType.number,
           maxLength: 6,
           autofocus: true,
@@ -165,6 +172,25 @@ class _OtpStep extends GetView<AuthController> {
             counterText: '',
           ),
           onSubmitted: (_) => controller.verifyOtp(),
+        ),
+        SizedBox(height: 10.h),
+        const Text(
+          'Tap the code suggested by your phone, allow SMS autofill, or paste it below.',
+        ),
+        Obx(
+          () => TextButton.icon(
+            onPressed: controller.isLoading.value ? null : controller.pasteCode,
+            icon: const Icon(Icons.content_paste_rounded, size: 18),
+            label: const Text('Paste code'),
+          ),
+        ),
+        Obx(
+          () => controller.codeHint.value == null
+              ? const SizedBox.shrink()
+              : Text(
+                  controller.codeHint.value!,
+                  style: const TextStyle(color: AppColors.primary),
+                ),
         ),
         SizedBox(height: 20.h),
         _ActionButton(
@@ -245,10 +271,7 @@ class _ActionButton extends StatelessWidget {
               ? SizedBox(
                   width: 18.w,
                   height: 18.w,
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
+                  child: const VikobaLoader(color: AppColors.primary),
                 )
               : Icon(icon),
           label: Text(label),

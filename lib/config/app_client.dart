@@ -24,7 +24,14 @@ class AppClient {
 
     dio.interceptors.add(AuthInterceptor());
 
-    dio.interceptors.add(LogInterceptor(requestBody: true, responseBody: true));
+    dio.interceptors.add(
+      LogInterceptor(
+        requestBody: false,
+        responseBody: false,
+        requestHeader: false,
+        responseHeader: false,
+      ),
+    );
 
     final cacheOptions = CacheOptions(
       store: MemCacheStore(),
