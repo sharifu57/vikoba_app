@@ -2,8 +2,41 @@ import 'dart:convert';
 
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class TokenStorage {
+  static const _secureStorage = FlutterSecureStorage();
+  static Future<void> _pendingTokenOperation = Future<void>.value();
+
+  static Future<T> _withTokenStorage<T>(Future<T> Function() action) {
+    final operation = _pendingTokenOperation.then((_) => action());
+    _pendingTokenOperation = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
+    return operation;
+  }
+
+  static Future<void> _migrateLegacyTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final key in [_accessToken, _refreshToken]) {
+      final legacy = prefs.getString(key);
+      if (legacy == null) continue;
+      if (await _secureStorage.read(key: key) == null && legacy.isNotEmpty) {
+        await _secureStorage.write(key: key, value: legacy);
+      }
+      await prefs.remove(key);
+    }
+  }
+
+  static Future<void> _writeTokens(String token, String refreshToken) =>
+      _withTokenStorage(() async {
+        await _secureStorage.write(key: _accessToken, value: token);
+        await _secureStorage.write(key: _refreshToken, value: refreshToken);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_accessToken);
+        await prefs.remove(_refreshToken);
+      });
   static const _accessToken = "access_token";
   static const _refreshToken = "refresh_token";
   static const _expires = "expires";
@@ -42,9 +75,7 @@ class TokenStorage {
           )
         : <Map<String, dynamic>>[];
 
-    await prefs.setString(_accessToken, response["token"] ?? "");
-
-    await prefs.setString(_refreshToken, response["refreshToken"] ?? "");
+    await _writeTokens(response["token"] ?? "", response["refreshToken"] ?? "");
 
     await prefs.setString(_expires, response["expired"] ?? "");
 
@@ -143,15 +174,15 @@ class TokenStorage {
     }
   }
 
-  static Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_accessToken);
-  }
+  static Future<String?> getToken() => _withTokenStorage(() async {
+    await _migrateLegacyTokens();
+    return _secureStorage.read(key: _accessToken);
+  });
 
-  static Future<String?> getRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_refreshToken);
-  }
+  static Future<String?> getRefreshToken() => _withTokenStorage(() async {
+    await _migrateLegacyTokens();
+    return _secureStorage.read(key: _refreshToken);
+  });
 
   static Future<String?> getFullName() async {
     final prefs = await SharedPreferences.getInstance();
@@ -240,14 +271,16 @@ class TokenStorage {
     return List<Map<String, dynamic>>.from(decoded);
   }
 
-  static Future<void> clear() async {
+  static Future<void> clear() => _withTokenStorage(() async {
+    await _secureStorage.delete(key: _accessToken);
+    await _secureStorage.delete(key: _refreshToken);
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-  }
+  });
 
   static Future<bool> isLoggedIn() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.containsKey(_accessToken);
+    final token = await getToken();
+    return token != null && token.isNotEmpty;
   }
 
   static Future<bool> isAccessTokenExpired() async {
@@ -266,8 +299,7 @@ class TokenStorage {
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setString(_accessToken, token);
-    await prefs.setString(_refreshToken, refreshToken);
+    await _writeTokens(token, refreshToken);
     await prefs.setString(_expires, expires);
   }
 
@@ -313,8 +345,6 @@ class TokenStorage {
     final prefs = await SharedPreferences.getInstance();
 
     final permissions = prefs.getStringList(_permissions) ?? [];
-
-    print("SAVED PERMISSIONS =====> $permissions");
 
     return permissions;
   }

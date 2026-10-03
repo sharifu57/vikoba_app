@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart' hide FormData, Response;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vikoba_app/core/formatters/money_formatter.dart';
@@ -92,6 +93,7 @@ void main() {
     () async {
       dotenv.loadFromString(envString: 'API_URL=https://example.test');
       SharedPreferences.setMockInitialValues({'access_token': 'test-token'});
+      FlutterSecureStorage.setMockInitialValues({});
       final dir = await Directory.systemTemp.createTemp('vikoba-proof-test-');
       try {
         final file = await File(

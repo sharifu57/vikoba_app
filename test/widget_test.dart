@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vikoba_app/core/storage/token_storage.dart';
 
@@ -20,6 +21,7 @@ void main() {
       'uses the OTP username and active group settings from the login payload',
       () async {
         SharedPreferences.setMockInitialValues({});
+        FlutterSecureStorage.setMockInitialValues({});
 
         await TokenStorage.saveSession({
           'token': 'abc',
