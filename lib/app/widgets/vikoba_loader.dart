@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:vikoba_app/app/constants/app_colors.dart';
 
-/// VIKOBA's community-circle loader. Use size 18?24 in buttons, 48?64 on pages.
 class VikobaLoader extends StatefulWidget {
   const VikobaLoader({
     super.key,
@@ -18,8 +17,6 @@ class VikobaLoader extends StatefulWidget {
   final Color? color;
   final bool onDark;
   final String label;
-
-  /// Optional progress for accessibility, e.g. splash initialization.
   final double? value;
 
   @override
