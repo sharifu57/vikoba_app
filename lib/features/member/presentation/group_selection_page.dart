@@ -28,8 +28,9 @@ class _GroupSelectionPageState extends State<GroupSelectionPage> {
       final groups = await TokenStorage.getGroups();
       if (mounted) setState(() => _groups = groups);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Your group list could not be loaded.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
