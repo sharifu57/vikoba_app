@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 
 import 'package:vikoba_app/app/constants/app_colors.dart';
+import 'member_binding.dart';
 import 'member_controller.dart';
 
 class MemberSharePurchasePage extends StatefulWidget {
@@ -1760,7 +1761,10 @@ class _MemberLoanApplicationsPageState
         '${_money(loan['principalAmount'])} · ${loan['status'].toString().replaceAll('_', ' ')}',
       ),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => Get.to(() => MemberLoanDetailsPage(loan: loan)),
+      onTap: () => Get.to(
+        () => MemberLoanDetailsPage(loan: loan),
+        binding: MemberBinding(),
+      ),
     ),
   );
 
@@ -2368,7 +2372,10 @@ class _MemberMeetingsPageState extends State<MemberMeetingsPage> {
     return Card(
       margin: EdgeInsets.only(bottom: 11.h),
       child: InkWell(
-        onTap: () => Get.to(() => MemberMeetingDetailPage(meeting: meeting)),
+        onTap: () => Get.to(
+          () => MemberMeetingDetailPage(meeting: meeting),
+          binding: MemberBinding(),
+        ),
         borderRadius: BorderRadius.circular(16.r),
         child: Padding(
           padding: EdgeInsets.all(15.w),

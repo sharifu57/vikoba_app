@@ -10,6 +10,7 @@ import 'package:vikoba_app/app/constants/app_colors.dart';
 import 'package:vikoba_app/app/widgets/vikoba_logo.dart';
 import 'package:vikoba_app/core/storage/token_storage.dart';
 import 'member_action_pages.dart';
+import 'member_binding.dart';
 import 'member_controller.dart';
 
 class MemberPage extends StatefulWidget {
@@ -131,8 +132,10 @@ class _MemberPageState extends State<MemberPage> {
                     .length;
                 return _NotificationBell(
                   count: pending,
-                  onTap: () =>
-                      Get.to(() => const MemberGuaranteeRequestsPage()),
+                  onTap: () => Get.to(
+                    () => const MemberGuaranteeRequestsPage(),
+                    binding: MemberBinding(),
+                  ),
                 );
               }),
               SizedBox(width: 12.w),
@@ -846,17 +849,26 @@ class _ProfileView extends StatelessWidget {
           _ProfileActionItem(
             label: 'Buy shares',
             icon: Icons.trending_up_rounded,
-            onTap: () => Get.to(() => const MemberSharePurchasePage()),
+            onTap: () => Get.to(
+              () => const MemberSharePurchasePage(),
+              binding: MemberBinding(),
+            ),
           ),
           _ProfileActionItem(
             label: 'Request loan',
             icon: Icons.request_quote_outlined,
-            onTap: () => Get.to(() => const MemberLoanRequestPage()),
+            onTap: () => Get.to(
+              () => const MemberLoanRequestPage(),
+              binding: MemberBinding(),
+            ),
           ),
           _ProfileActionItem(
             label: 'View meetings',
             icon: Icons.event_available_rounded,
-            onTap: () => Get.to(() => const MemberMeetingsPage()),
+            onTap: () => Get.to(
+              () => const MemberMeetingsPage(),
+              binding: MemberBinding(),
+            ),
           ),
           _ProfileActionItem(
             label: Get.isDarkMode ? 'Use light theme' : 'Use dark theme',
@@ -1070,27 +1082,38 @@ class _QuickActionsRow extends StatelessWidget {
       _QuickAction(
         title: 'Buy\nshares',
         icon: Icons.trending_up_rounded,
-        onTap: () => Get.to(() => const MemberSharePurchasePage()),
+        onTap: () => Get.to(
+          () => const MemberSharePurchasePage(),
+          binding: MemberBinding(),
+        ),
       ),
       _QuickAction(
         title: 'Loan\nrequest',
         icon: Icons.request_quote_rounded,
-        onTap: () => Get.to(() => const MemberLoanRequestPage()),
+        onTap: () => Get.to(
+          () => const MemberLoanRequestPage(),
+          binding: MemberBinding(),
+        ),
       ),
       _QuickAction(
         title: 'Fines',
         icon: Icons.gavel_rounded,
-        onTap: () => Get.to(() => const MemberFinesPage()),
+        onTap: () =>
+            Get.to(() => const MemberFinesPage(), binding: MemberBinding()),
       ),
       _QuickAction(
         title: 'Meetings',
         icon: Icons.event_available_rounded,
-        onTap: () => Get.to(() => const MemberMeetingsPage()),
+        onTap: () =>
+            Get.to(() => const MemberMeetingsPage(), binding: MemberBinding()),
       ),
       _QuickAction(
         title: 'My\nloans',
         icon: Icons.account_tree_rounded,
-        onTap: () => Get.to(() => const MemberLoanApplicationsPage()),
+        onTap: () => Get.to(
+          () => const MemberLoanApplicationsPage(),
+          binding: MemberBinding(),
+        ),
       ),
     ];
 
@@ -1169,7 +1192,10 @@ class _MeetingTile extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: 10.h),
       child: InkWell(
-        onTap: () => Get.to(() => MemberMeetingDetailPage(meeting: meeting)),
+        onTap: () => Get.to(
+          () => MemberMeetingDetailPage(meeting: meeting),
+          binding: MemberBinding(),
+        ),
         borderRadius: BorderRadius.circular(18.r),
         child: Container(
           padding: EdgeInsets.all(14.w),
